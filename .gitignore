@@ -1,0 +1,16 @@
+# Mallin painot, äänet ja aineisto eivät kuulu versionhallintaan (perusmallin lisenssi CC BY-NC, oma ääni)
+data/
+checkpoints/
+base/
+base-voxcpm2/
+*.wav
+*.aifc
+*.m4a
+*.safetensors
+*.pt
+
+# Ympäristöt ja välimuistit
+.venv/
+.venv-voxcpm/
+__pycache__/
+.DS_Store
