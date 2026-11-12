@@ -107,12 +107,20 @@ Huomioita:
 Malli lukee osan lauseista tasaisesti: uusi termi jää ilman painoa ("nimeä metakognitiivinen laiskuus"), konnektiivin jälkeinen sana ei nouse esiin ("silti vaikeampaan", "siksi kahdella") ja luettelo katkeaa lopun kaltaiseen laskuun. Tauot, pilkut ja lauseen jakaminen eivät auttaneet. Lausepaino vaihtelee kuitenkin siemenen mukaan, joten toimiva keino on tuottaa samasta tekstistä useita ottoja ja antaa käyttäjän valita korvalla. Neljässä lauseessa viidestä kelvollinen otto löytyi kahdeksasta.
 
 ```bash
-for s in 4 5 6 7 8 9 10 11; do
-  $PY -I $F5/scripts/speak.py "ilmiöstä käytetään nimeä metakognitiivinen laiskuus." --seed $s --out /polku/lause-s$s.wav
-done
+$PY -I $F5/scripts/speak.py "ilmiöstä käytetään nimeä metakognitiivinen laiskuus." --seeds 4-11 --out /polku/kansio
 ```
 
-Jokainen `speak.py`-ajo lataa mallin uudelleen (noin 30 s). Kun lauseita on useita, lataa malli kerran Pythonissa ja kutsu `f5fi.synthesize(..., seed=s, candidates=1)` jokaisella siemenellä. Älä käytä tässä `--candidates`-valitsinta, koska se valitsee oton Whisperin pisteillä, jotka eivät erota intonaatiota. Tee otoista kuuntelusivu, jolla käyttäjä vertaa niitä rinnakkain.
+Valitsin `--seeds` tuottaa yhden oton jokaisella siemenellä (`lause01-s04.wav` …) ja kokoaa kansioon kuuntelusivun `index.html`, jolla käyttäjä vertaa ottoja ja valitsee parhaan. Valinnat näkyvät sivun alareunassa kopioitavana tekstinä. Kun ajat komennon uudelleen toisella tekstillä ja samalla kansiolla, lause lisätään samalle sivulle. Valmiita ottoja ei tehdä uudelleen. Tiedot ovat tiedostossa `siemenet.json`. Älä käytä tässä `--candidates`-valitsinta, koska se valitsee oton Whisperin pisteillä, jotka eivät erota intonaatiota. Valitsimet eivät käy yhdessä.
+
+Jos lauseita on useita, lataa malli kerran Pythonissa:
+
+```python
+tts = f5fi.load_model()
+ref = f5fi.DEFAULT_REF
+ref_text = open(ref[:-4] + ".txt", encoding="utf-8").read().strip()
+for nimi, teksti in lauseet:
+    f5fi.seed_takes(tts, ref, ref_text, teksti, "/polku/kansio", f5fi.parse_seeds("4-11"), name=nimi)
+```
 
 Luettelossa ja-sana voi tarvita pidemmän välin kuin mikään siemen antaa. Silloin auttoi pilkku ennen ja-sanaa mallin tekstissä yhdessä siemenvalinnan kanssa: "tekoäly voi luonnostella, ideoida, ja haastaa." (siemen 8). Pilkku ei kuulu näytettävään tekstiin.
 

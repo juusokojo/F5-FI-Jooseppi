@@ -24,8 +24,12 @@ Fixes on top of F5's own inference, each found by listening tests (see README):
   lines wrong even when they were right, so judge them by ear.
 - Randomness: the seed changes stress and can add or remove an extra syllable (seed 2 fixed "pullaato").
   synthesize(..., candidates=3) makes three takes and keeps the one local Whisper hears closest to the text.
+  Stress and intonation also change with the seed, but Whisper does not hear them: seed_takes() keeps one take per
+  seed and builds a listening page for choosing by ear (E9 in docs/aantamishavainnot.md).
 """
 import difflib
+import html
+import json
 import os
 import re
 import sys
@@ -274,3 +278,144 @@ def _synth_one(tts, ref, ref_text, text, nfe, speed, seed, tail_s, candidates):
         if sc >= 1.0:
             break
     return best[2], best[3], best[1], takes
+
+
+SEEDS_FILE = "siemenet.json"  # what seed_takes() has made in a folder; the page is built from it
+SEEDS_PAGE = "index.html"
+
+
+def parse_seeds(spec):
+    """Seeds from "4-11", "4,6,9" or "4-6,9" (in that order, no repeats)."""
+    seeds = []
+    for part in str(spec).replace(" ", "").split(","):
+        if not part:
+            continue
+        lo, dash, hi = part.partition("-")
+        lo = int(lo)
+        hi = int(hi) if dash else lo  # "4-" is an error, not 4
+        if hi < lo:
+            raise ValueError(f"siemenväli väärin päin: {part}")
+        seeds += [x for x in range(lo, hi + 1) if x not in seeds]
+    if not seeds:
+        raise ValueError(f"ei siemeniä: {spec!r}")
+    return seeds
+
+
+def seed_takes(tts, ref, ref_text, text, out_dir, seeds, name=None, whisper=True, force=False, ckpt=None, **kw):
+    """One take of `text` per seed in `out_dir`, for choosing stress and intonation by ear (E9).
+
+    Takes are <name>-sNN.wav. The same text keeps its name, and a new text gets the next free one (lause01,
+    lause02, ...), so several sentences can be made into one folder, also by separate runs. A take that already
+    exists for the same text and settings is not made again unless `force`. Whisper's transcript is kept as a note
+    only: it shows a missing or extra word, not stress. Writes <out_dir>/siemenet.json and the local listening page
+    <out_dir>/index.html (not to be published). Other keyword arguments go to synthesize (nfe, speed, tail_s,
+    normalize, colon_split); candidates is always 1. Returns the entry of this text from siemenet.json.
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    data = _load_seeds(out_dir)
+    kw.pop("candidates", None)
+    settings = {"ref": os.path.abspath(ref), "ckpt": os.path.abspath(ckpt) if ckpt else None,
+                **{k: kw[k] for k in sorted(kw)}}
+    entry = next((e for e in data["lauseet"] if e["text"] == text and (name is None or e["name"] == name)), None)
+    if entry is None:
+        used = {e["name"] for e in data["lauseet"]}
+        if name is None:
+            name = next(f"lause{i:02d}" for i in range(1, 10 ** 4) if f"lause{i:02d}" not in used)
+        elif name in used:
+            raise ValueError(f"nimi {name} on jo toisella tekstillä kansiossa {out_dir}")
+        entry = {"name": name, "text": text, "model_text": None, "takes": []}
+        data["lauseet"].append(entry)
+    if entry.get("settings") != settings:
+        entry["settings"], entry["takes"] = settings, []  # takes made with other settings would not compare
+    by_seed = {t["seed"]: t for t in entry["takes"]}
+    for seed in seeds:
+        wav = f"{entry['name']}-s{seed:02d}.wav"
+        path = os.path.join(out_dir, wav)
+        if not force and seed in by_seed and os.path.exists(path):
+            continue
+        res = synthesize(tts, ref, ref_text, text, path, seed=seed, candidates=1, **kw)
+        entry["model_text"] = res.text
+        take = {"seed": seed, "file": wav, "duration_s": round(sf.info(path).duration, 2)}
+        if whisper:
+            wave, sr = sf.read(path, dtype="float32")
+            heard = transcribe(wave, sr)
+            take.update(whisper=heard, score=round(score(res.text.replace(" | ", " "), heard), 3))
+        by_seed[seed] = take
+        entry["takes"] = sorted(by_seed.values(), key=lambda t: t["seed"])
+        _save_seeds(out_dir, data)  # after every take, so an interrupted run keeps what it made
+    _save_seeds(out_dir, data)
+    return entry
+
+
+def _load_seeds(out_dir):
+    path = os.path.join(out_dir, SEEDS_FILE)
+    if os.path.exists(path):
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    return {"lauseet": []}
+
+
+def _save_seeds(out_dir, data):
+    with open(os.path.join(out_dir, SEEDS_FILE), "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=1)
+    with open(os.path.join(out_dir, SEEDS_PAGE), "w", encoding="utf-8") as f:
+        f.write(seed_page(data))
+
+
+def seed_page(data):
+    """Local listening page for the takes in siemenet.json: each sentence with its takes side by side and a
+    choice per sentence. The choices are collected into a text to copy back (and kept in the browser)."""
+    e = html.escape
+    blocks = []
+    for entry in data["lauseet"]:
+        rows = []
+        for t in entry["takes"]:
+            note = ""
+            if "whisper" in t:
+                note = f'<div class=note>Whisper ({t["score"]:.2f}): {e(t["whisper"])}</div>'
+            rows.append(f'<label class=take><input type=radio name="{e(entry["name"])}" value="{t["seed"]}">'
+                        f'<span class=seed>siemen {t["seed"]}</span>'
+                        f'<audio controls preload="none" src="{e(t["file"])}"></audio>'
+                        f'<span class=dur>{t["duration_s"]:.1f} s</span>{note}</label>')
+        model = ""
+        if entry.get("model_text") and entry["model_text"] != entry["text"]:
+            model = f'<div class=note>mallille: {e(entry["model_text"])}</div>'
+        blocks.append(f'<section><h2>{e(entry["name"])}</h2><p class=text>{e(entry["text"])}</p>{model}'
+                      f'{"".join(rows)}</section>')
+    return f"""<!doctype html><html lang="fi"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Siemenvalinta</title>
+<style>
+:root{{--bg:#f6f3ec;--fg:#1f2a26;--muted:#5c6862;--card:#fff;--line:#d9d3c7;--pick:#e3efe6}}
+@media (prefers-color-scheme:dark){{:root{{--bg:#191c1b;--fg:#e7e4dc;--muted:#a3aba6;--card:#232826;--line:#3a403d;--pick:#24372b}}}}
+body{{font:16px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:16px;max-width:52em}}
+section{{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:14px 0}}
+h2{{font-size:1rem;margin:0;color:var(--muted)}} .text{{font-size:1.1rem;margin:.2em 0 .5em}}
+.take{{display:grid;grid-template-columns:auto auto 1fr auto;gap:4px 10px;align-items:center;padding:6px;border-radius:6px}}
+.take:has(input:checked){{background:var(--pick)}} audio{{width:100%;min-width:160px}}
+.seed{{font-variant-numeric:tabular-nums;white-space:nowrap}} .dur{{color:var(--muted);font-size:.85rem}}
+.note{{grid-column:2/-1;color:var(--muted);font-size:.85rem}} section>.note{{margin-bottom:.4em}}
+textarea{{width:100%;box-sizing:border-box;font:inherit;padding:6px;min-height:6em;background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:6px}}
+</style></head><body>
+<h1>Siemenvalinta</h1>
+<p>Samasta tekstistä on yksi otto kullakin siemenellä. Kuuntele ja valitse jokaisesta lauseesta otto, jossa paino ja
+sävelkulku ovat oikein. Whisperin litterointi kertoo vain puuttuvista tai ylimääräisistä sanoista, ei painosta.
+Sivu on paikallinen tiedosto: älä julkaise sitä tai ääntä verkkoon.</p>
+{"".join(blocks)}
+<h2>Valinnat</h2><textarea id=out readonly></textarea>
+<script>
+const KEY = "siemenvalinta:" + location.pathname;
+function load() {{ try {{ return JSON.parse(localStorage.getItem(KEY) || "{{}}"); }} catch (e) {{ return {{}}; }} }}
+function show() {{
+  const picks = {{}};
+  document.querySelectorAll("input[type=radio]:checked").forEach(r => picks[r.name] = r.value);
+  document.getElementById("out").value = Object.entries(picks).map(([n, s]) => n + ": siemen " + s).join("\n");
+  try {{ localStorage.setItem(KEY, JSON.stringify(picks)); }} catch (e) {{}}
+}}
+const saved = load();
+document.querySelectorAll("input[type=radio]").forEach(r => {{
+  if (saved[r.name] === r.value) r.checked = true;
+  r.addEventListener("change", show);
+}});
+show();
+</script></body></html>
+"""

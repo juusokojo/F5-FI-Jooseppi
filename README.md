@@ -117,6 +117,22 @@ Kokeiden kuuntelusivut on poistettu, kun niiden tulokset otettiin käyttöön. O
 
 Tiedostossa `muunnelmat.tsv` on yksi muunnelma riviä kohden. Rivin kentät ovat nimi, teksti ja asetukset, ja ne erotetaan sarkaimella. Asetukset annetaan muodossa `tail_s=0.3 nfe=64 seed=2 ref_pad_ms=600`.
 
+### Siemenvalinta korvalla
+
+```bash
+.venv/bin/python scripts/speak.py "Ilmiöstä käytetään nimeä metakognitiivinen laiskuus." --seeds 4-11 --out data/vertailu/<kansio>
+```
+
+Lausepaino, fokus ja luettelon sävelkulku vaihtelevat siemenen mukaan, mutta Whisper ei kuule niitä (katso [aantamishavainnot.md, kohta 8](docs/aantamishavainnot.md#8-lausepaino-ja-luettelon-intonaatio)). Valitsin `--seeds` tuottaa yhden oton jokaisella siemenellä (`4-11`, `4,6,9` tai `4-6,9`) kansioon `--out` ja kokoaa kansioon kuuntelusivun `index.html`. Sivulla valitaan jokaisesta lauseesta paras otto, ja valinnat kootaan sivun alareunaan kopioitavaksi tekstiksi. Whisperin litterointi näkyy jokaisen oton kohdalla vain huomautuksena puuttuvista tai ylimääräisistä sanoista.
+
+- **Monta lausetta samalle sivulle:** aja komento uudelleen toisella tekstillä ja samalla kansiolla. Lauseet nimetään järjestyksessä (`lause01`, `lause02` …), tai nimen voi antaa valitsimella `--name`. Tiedostot ovat muotoa `lause01-s04.wav`.
+- **Keskeytys ja lisäsiemenet:** valmiita ottoja ei tehdä uudelleen, joten ajon voi jatkaa tai siemeniä lisätä (`--seeds 12-15`). Valitsin `--force` tekee otot uudelleen. Jos viite, malli tai asetukset muuttuvat, lauseen vanhat otot jätetään pois sivulta, koska ne eivät olisi vertailukelpoisia.
+- **Tiedot:** kansion `siemenet.json` sisältää jokaisen lauseen tekstin, mallille menneen tekstin, asetukset sekä jokaisen oton siemenen, keston ja Whisperin litteroinnin.
+- **Pythonissa:** `f5fi.seed_takes(tts, ref, ref_text, teksti, kansio, f5fi.parse_seeds("4-11"))`, kun malli on ladattu kerran.
+- `--seeds` ja `--candidates` eivät käy yhdessä: siemenvalinnassa jokainen otto säilytetään, ja valinnan tekee kuuntelija. `--no-whisper` jättää litteroinnin pois.
+
+Yksi otto kestää 15–25 sekuntia, joten kahdeksan siementä kestää noin kolme minuuttia lausetta kohden. Kun koneessa on samaan aikaan auki muistia vieviä ohjelmia (esimerkiksi Teams, Word ja selain), mallin muisti siirtyy levylle ja otto voi kestää kymmeniä minuutteja. Sulje silloin ylimääräiset ohjelmat.
+
 ## Viitenäytteet ja vertailu
 
 ```bash
