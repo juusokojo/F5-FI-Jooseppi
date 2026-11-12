@@ -350,18 +350,27 @@ joten kuuntele. Punainen: hylätty.</p>{miss}
         f.write(page)
 
 
+def metadata_rows(out):
+    """(wav path, text) of every kept clip in the .tsv files of out, texts through f5fi.normalize_text."""
+    rows = []
+    for tsv in sorted(glob.glob(os.path.join(out, "*.tsv"))):
+        with open(tsv, encoding="utf-8") as f:
+            for r in csv.DictReader(f, delimiter="\t"):
+                if r["file"] and r["status"].startswith("käytössä"):
+                    rows.append((os.path.abspath(os.path.join(out, "wavs", r["file"])),
+                                 f5fi.normalize_text(r["written"])))
+    return rows
+
+
 def rebuild_metadata(out):
-    """metadata.csv from every .tsv in out: kept clips, written text through f5fi.normalize_text."""
-    n = 0
+    """metadata.csv from every .tsv in out (metadata_rows). finetune.py refuses to train on a metadata.csv that
+    differs from this, e.g. after a change in the text rules."""
+    rows = metadata_rows(out)
     with open(os.path.join(out, "metadata.csv"), "w", encoding="utf-8", newline="") as f:
         f.write("audio_file|text\n")
-        for tsv in sorted(glob.glob(os.path.join(out, "*.tsv"))):
-            for r in csv.DictReader(open(tsv, encoding="utf-8"), delimiter="\t"):
-                if r["file"] and r["status"].startswith("käytössä"):
-                    text = f5fi.normalize_text(r["written"])
-                    f.write(f"{os.path.abspath(os.path.join(out, 'wavs', r['file']))}|{text}\n")
-                    n += 1
-    return n
+        for path, text in rows:
+            f.write(f"{path}|{text}\n")
+    return len(rows)
 
 
 def report(rows, missing, n_sentences):

@@ -4,7 +4,7 @@ Tämä ohje on tarkoitettu Claude Code -istunnolle, joka tuottaa toisessa projek
 
 ## Tilanne
 
-- Malli on F5-TTS Finnishin perusmalli, jota **ei ole vielä hienosäädetty**. Kansiossa `checkpoints/` ei ole vielä mitään. Käyttäjän ääni tulee lyhyestä viitenäytteestä, jota malli matkii.
+- **Hienosäädetty malli on valmis** (12.11.2026): `$F5/checkpoints/oma-v1/malli_002000.safetensors`. Se on hienosäädetty käyttäjän 14 minuutin nauhoituksilla (lauseet 1–4 ja lukeminen_1), ja käyttäjä valitsi sen kuuntelemalla kuuden tallennetun vaiheen joukosta. Malli otetaan käyttöön valitsimella `--ckpt` tai Pythonissa `load_model(ckpt)`. Ilman sitä käytössä on perusmalli. Molemmissa tapauksissa ääni tulee myös viitenäytteestä, jota malli matkii.
 - Kielen laatu on hyvä. Heikkouksia ovat tasainen eläytyminen ja se, että äänen väri ei ole aivan käyttäjän oma.
 - Moduuli `scripts/f5fi.py` korjaa tekstiä ennen synteesiä ja säätää F5:n omaa käsittelyä. Korjaukset on hyväksytty kuuntelukokeissa, ja ne ovat oletuksena päällä. Niitä ei tarvitse eikä pidä tehdä itse.
 - Kuuntelussa on löytynyt virheitä, joita moduuli ei vielä korjaa (moduuli korjaa 12.11.2026 alkaen myös käskymuodon, luettelon ja yhdyssanojen kahdennukset, yhdyssanan vokaalirajan ja kaksoispisteen tauon). Ne korjataan mallille annettavassa tekstissä, katso [Kirjoitusasukorjaukset, joita moduuli ei vielä tee](#kirjoitusasukorjaukset-joita-moduuli-ei-vielä-tee). Havainnot perusteluineen ovat tiedostossa `$F5/docs/aantamishavainnot.md`.
@@ -22,6 +22,7 @@ Tämä ohje on tarkoitettu Claude Code -istunnolle, joka tuottaa toisessa projek
 ```
 F5=/Users/jkojo22/Koodausprojektit/Kielimallit/f5-fi
 PY=$F5/.venv/bin/python                              # aja aina tällä, -I-valitsimen kanssa
+CKPT=$F5/checkpoints/oma-v1/malli_002000.safetensors  # suositeltu hienosäädetty malli
 ```
 
 - **Viite:** jätä viite valitsematta, niin käytössä on aina suositeltu viite. Skriptit `speak.py` ja `read_text.py` käyttävät sitä, kun `--ref` puuttuu, ja Pythonissa se on vakiossa `f5fi.DEFAULT_REF`. Älä kirjoita viitteen polkua omaan koodiin, koska suositus voi vaihtua. Nykyinen suositus on `viite_selitys_2` (kansio `data/viite/v3/`, eläytyen luettu selittävä teksti). Se valittiin 19 viitteen joukosta kuuntelemalla, kun kaikilla luettiin sama pitkän tekstin katkelma (`data/vertailu/2026-11-10_viitteet_v3`). Edellinen suositus oli `data/viite/v2-wav/viite_kerronta_1`. Muut viitteet ovat samassa kansiossa: aiheet jannite, juhla, kirjat, lumi, rengas ja selitys, ja jokaisesta otot 1 (hillitysti), 2 (eläytyen) ja 3 (vähän liioitellen). F5 kopioi viitteestä tempon ja sävyn, joten viite määrää luennan tyylin.
@@ -31,13 +32,13 @@ PY=$F5/.venv/bin/python                              # aja aina tällä, -I-vali
 ## Lyhyt teksti: yksi lause tai repliikki
 
 ```bash
-$PY -I $F5/scripts/speak.py "Tekstiä puheeksi." --candidates 3 --out /polku/puhe.wav
+$PY -I $F5/scripts/speak.py "Tekstiä puheeksi." --ckpt $CKPT --candidates 3 --out /polku/puhe.wav
 ```
 
 ## Pitkä teksti: kappaleita tai kokonainen teksti
 
 ```bash
-$PY -I $F5/scripts/read_text.py /polku/teksti.txt --out /polku/kansio
+$PY -I $F5/scripts/read_text.py /polku/teksti.txt --ckpt $CKPT --out /polku/kansio
 ```
 
 Skripti jakaa tekstin lauseiksi ja tuottaa jokaisen erikseen, koska korjaukset on hiottu yksittäisille lauseille. Sitten se liittää lauseet yhteen niin, että lauseiden väliin tulee 0,3 sekunnin tauko ja kappaleiden väliin 0,7 sekunnin tauko. Kappaleet erotetaan toisistaan tyhjällä rivillä. Vuorosanojen ajatusviivat (`– `) jätetään pois. Tulokset tallentuvat näin:
@@ -57,6 +58,7 @@ Selkein tapa on ajaa skriptit erillisinä prosesseina f5-fi:n omalla Pythonilla.
 import subprocess
 F5 = "/Users/jkojo22/Koodausprojektit/Kielimallit/f5-fi"
 subprocess.run([f"{F5}/.venv/bin/python", "-I", f"{F5}/scripts/speak.py", teksti,
+                "--ckpt", f"{F5}/checkpoints/oma-v1/malli_002000.safetensors",
                 "--candidates", "3",          # ilman --ref käytössä on suositeltu viite
                 "--out", polku], check=True)
 ```
@@ -66,7 +68,7 @@ Jos tuotat monta lausetta ja ajat koodia f5-fi:n omalla ympäristöllä, lataa m
 ```python
 import sys; sys.path.insert(0, "/Users/jkojo22/Koodausprojektit/Kielimallit/f5-fi/scripts")
 import f5fi
-tts = f5fi.load_model()                       # perusmalli; hienosäädetty: load_model("<polku checkpointiin>")
+tts = f5fi.load_model("/Users/jkojo22/Koodausprojektit/Kielimallit/f5-fi/checkpoints/oma-v1/malli_002000.safetensors")  # hienosäädetty; load_model() = perusmalli
 ref = f5fi.DEFAULT_REF                        # suositeltu viite
 ref_text = open(ref[:-4] + ".txt", encoding="utf-8").read().strip()
 res = f5fi.synthesize(tts, ref, ref_text, "Tekstiä puheeksi.", "puhe.wav", candidates=3)
@@ -141,4 +143,4 @@ Luettelossa ja-sana voi tarvita pidemmän välin kuin mikään siemen antaa. Sil
 
 ## Kun malli päivittyy
 
-Kun hienosäädetty malli valmistuu, se tallennetaan kansioon `$F5/checkpoints/` ja otetaan käyttöön valitsimella `--ckpt` (`load_model(ckpt)` Pythonissa). Samalla tämä ohje päivitetään. Lue ohje uudelleen, ennen kuin aloitat uutta puhetyötä: `$F5/docs/kaytto-muissa-projekteissa.md`.
+Hienosäädetyt mallit tallennetaan kansioon `$F5/checkpoints/<ajo>/` ja otetaan käyttöön valitsimella `--ckpt` (`load_model(ckpt)` Pythonissa). Nykyinen suositus on `checkpoints/oma-v1/malli_002000.safetensors`. Kun käyttäjä nauhoittaa lisää ja malli hienosäädetään uudelleen, suositus vaihtuu ja tämä ohje päivitetään. Lue ohje uudelleen, ennen kuin aloitat uutta puhetyötä: `$F5/docs/kaytto-muissa-projekteissa.md`.

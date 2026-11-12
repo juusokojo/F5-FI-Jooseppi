@@ -243,7 +243,62 @@ Puhekielisissä lauseissa (sarja 4) lähes jokainen pätkä merkitään tarkiste
 
 Whisper kirjoittaa luvut numeroina ("kello 10.00"). Pisteytys tulkitsee numerot niiksi lukusanoiksi, joiden kohdalla ne ovat. Siksi kesken jäänyttä lukua ei havaita.
 
-F5:n valmistelutyökalu (`f5_tts.train.datasets.prepare_csv_wavs`) etsii sanastoa F5:n omasta asennuskansiosta. Sille pitää antaa suomenkielisen perusmallin `vocab.txt`. Aineiston merkit sisältyvät perusmallin sanastoon, joten hienosäätö voi jatkaa suoraan perusmallista.
+Aineiston merkit sisältyvät perusmallin sanastoon, joten hienosäätö voi jatkaa suoraan perusmallista. F5:n omaa valmistelutyökalua (`prepare_csv_wavs`) ei tarvita, koska [finetune.py](scripts/finetune.py) lukee tiedoston `metadata.csv` suoraan.
+
+## Hienosäätö
+
+```bash
+.venv/bin/python scripts/finetune.py --name oma-v1
+```
+
+[finetune.py](scripts/finetune.py) hienosäätää mallin tiedoston `data/aineisto/metadata.csv` pätkillä. Ajo tallentuu kansioon `checkpoints/<nimi>/`:
+
+| Tiedosto | Sisältö |
+|---|---|
+| `malli_000500.safetensors` | Puhumiseen käytettävä malli. Uusi malli tallennetaan 500 askeleen välein (`--save-every`). |
+| `index.html`, `naytteet/` | Kuuntelusivu: samat testilauseet jokaisella tallennetulla mallilla ja lähtömallilla, samalla viitteellä ja siemenellä. |
+| `loki.csv` | Häviö, validointihäviö, askeleen kesto ja muistinkäyttö askelittain. |
+| `tila.pt` | Ajon jatkamiseen tarvittava tila (painot, optimoija ja keskiarvomalli). Tiedosto korvataan jokaisella tallennuksella. |
+| `asetukset.json` | Asetukset ja jokainen ajokerta: pätkien määrä, minuutit ja laite. |
+
+**Mallin valinta.** Avaa `checkpoints/<nimi>/index.html` ja kuuntele sarakkeet vasemmalta oikealle. Äänen pitäisi muuttua omaksesi ja pysyä selkeänä. Jos myöhempi malli alkaa sotkea sanoja tai lukea tasaisemmin, valitse aiempi malli. Validointihäviö lasketaan pätkistä, joita malli ei ole nähnyt, ja se on vain vihje: kuuntelu ratkaisee. Valittu malli otetaan käyttöön valitsimella `--ckpt`:
+
+```bash
+.venv/bin/python scripts/speak.py "Tekstiä puheeksi." --ckpt checkpoints/oma-v1/malli_002000.safetensors --out puhe.wav
+```
+
+Ensimmäisessä ajossa (`oma-v1`, 12.11.2026) validointihäviö laski 0,96:sta 0,67:ään ja tasaantui 2 000 askeleen jälkeen. Kuuntelussa askel 2000 oli paras, joten se jätettiin ja muut mallit sekä `tila.pt` poistettiin.
+
+**Kesto ja levytila.** Oletusasetuksilla (3 000 askelta) ajo kestää M3-Macilla noin kaksi ja puoli tuntia. Jokainen tallennettu malli vie 1,35 Gt ja `tila.pt` 5,4 Gt, joten 3 000 askeleen ajo vie noin 14 Gt. Mallit, joita et valitse, voi poistaa.
+
+**Jatkaminen ja keskeytys.** Sama komento jatkaa keskeytynyttä ajoa. Ctrl-C tallentaa tilan nykyisen askeleen jälkeen. `--steps 5000` kouluttaa valmista ajoa pidemmälle. Oppimisnopeus nousee 200 askeleen aikana arvoon 1e-5 ja pysyy siinä, joten jatkaminen ei muuta aiempaa kulkua.
+
+**Uudet äänitteet.** Aineisto luetaan jokaisen käynnistyksen alussa. Kun `prepare_dataset.py` on lisännyt uudet äänitteet tiedostoon `metadata.csv`, on kaksi tapaa:
+
+- **Uusi ajo perusmallista** kaikella aineistolla (`--name oma-v2`). Tämä on selkein vertailtava, koska testilauseet, viite ja siemen ovat samat kuin aiemmassa ajossa.
+- **Aiemman ajon jatkaminen** suuremmalla aineistolla (sama `--name` ja suurempi `--steps`), tai uusi ajo aiemmasta mallista: `--init checkpoints/oma-v1/malli_002000.safetensors`. Jatkaminen vaatii tiedoston `tila.pt`, joten jos se on poistettu, käytä `--init`-vaihtoehtoa.
+
+Joka kahdeskymmenes pätkä jätetään validointiin. Valinta tehdään pätkän nimen perusteella, joten pätkä pysyy samalla puolella, kun aineisto kasvaa. Jokaisen ajokerran aineisto kirjataan tiedostoon `asetukset.json`.
+
+**Tarkistukset ennen ajoa.** Skripti ei käynnisty, jos
+
+- `metadata.csv` ei vastaa .tsv-tiedostoja tai nykyisiä tekstisääntöjä (aja silloin `prepare_dataset.py --rebuild`),
+- aineistossa on merkki, jota mallin sanastossa ei ole, tai
+- vapaata muistia on alle 9 Gt. Silloin skripti listaa eniten muistia vievät ohjelmat. Sulje ne ja aja komento uudelleen.
+
+**Miten skripti toimii:**
+
+- **Häviö on F5:n oma** (`CFM.forward`): malli täyttää satunnaisen osan pätkästä, ja osassa askelista teksti tai ääniehto jätetään pois. Teksti muunnetaan merkeiksi samalla funktiolla kuin synteesissä (`convert_char_to_pinyin`). Funktio lisää välin sanan sisään ä:n ja ö:n jälkeen ("syö ttää"), ja perusmalli on oppinut tekstin tässä muodossa.
+- **Opetussilmukka on oma** eikä F5:n `Trainer`. F5:n silmukka pitää mallista toista kopiota laitteen muistissa, tallentaa optimoijan jokaiseen 5 Gt:n tarkistuspisteeseen ja vaatii aineiston omassa muodossaan.
+- **Tallennettu malli on painojen liukuva keskiarvo,** joka tasoittaa pienten erien kohinaa. Keskiarvo pidetään keskusmuistissa ja päivitetään 10 askeleen välein.
+- **Muistin säästö:** aktivaatiot lasketaan takaisinkuljetuksessa uudelleen (gradient checkpointing), ja erässä on enintään 1 600 kehystä eli noin 17 sekuntia ääntä (`--batch-frames`). M3-Macilla (16 Gt) askel kestää noin 2,5–3,1 sekuntia ja vie 6,5 Gt muistia (mitattu 12.11.2026, 259 pätkää, 3 000 askelta). MPS:n välimuisti vapautetaan jokaisella lokirivillä, koska muuten muistinkäyttö kasvoi pitkässä ajossa 11 gigatavuun ja askel hidastui. Ilman uudelleenlaskentaa sama erä vei 10,8 Gt. Yli 15 sekunnin pätkät jätetään pois (`--max-clip-s`). Jos muisti ei riitä, puolita erä ja kerää kaksi erää askelta kohden: `--batch-frames 800 --accum 2`.
+- **Raskaimmat erät ajetaan ensin,** joten muistin loppuminen näkyy ensimmäisen minuutin aikana eikä keskellä yötä.
+- **Jos kone alkaa siirtää muistia levylle,** askeleet hidastuvat moninkertaisesti. Silloin skripti tallentaa tilan ja pysähtyy.
+- Mac ei mene lepotilaan ajon aikana (`caffeinate`).
+
+**MPS-korjaus.** F5:n aktivaatioiden uudelleenlaskenta antaa Macin MPS-laitteella hieman väärät gradientit, koska PyTorch ei palauta MPS:n satunnaislukutilaa uudelleenlaskentaa varten ja dropout arvotaan toisin kuin ensimmäisellä kerralla. `finetune.grad_checkpoint` palauttaa tilan itse. Testi `test_same_gradients_mps` varmistaa, että gradientit ovat samat kuin ilman uudelleenlaskentaa.
+
+Testit (`tests/test_finetune.py`) ajavat saman silmukan pienellä mallilla: tiedostot, jatkaminen, pysäytys, keskiarvomalli ja tallennetun mallin lataus F5:n omalla latausfunktiolla.
 
 ## Mallin tiedot
 

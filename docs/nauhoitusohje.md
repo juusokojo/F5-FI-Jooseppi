@@ -172,8 +172,8 @@ Claude tekee seuraavat vaiheet:
 3. Litteroi pätkät paikallisella Whisperillä ja vertaa litterointia luettuun tekstiin. Puhekielisissä lauseissa Whisper muuttaa usein sanat kirjakielisiksi, joten ne korjataan vastaamaan sitä, mitä sanoit.
 4. Kokoaa sinulle tarkistettavaksi listan pätkistä, joissa litterointi ja teksti poikkeavat toisistaan. Kuuntelet ne ja päätät, korjataanko vai poistetaanko pätkä.
 5. Ajaa tarkistettuihin litterointeihin saman esikäsittelyn, jota käytetään synteesissä (rajageminaatio ja pienet Ä ja Ö). Näin malli oppii yhdistämään merkityn tekstin äänitteisiisi, joissa kahdentuma kuuluu luonnostaan.
-6. Tekee aineistosta F5-TTS:n harjoitusdatan ja ajaa koneella lyhyen kokeilun, joka varmistaa, että hienosäätö käynnistyy.
-7. Varsinainen hienosäätö ajetaan näytönohjaimella, esimerkiksi yliopiston GPU-palvelimella. Tästä sovitaan erikseen.
+6. Hienosäätää mallin skriptillä `scripts/finetune.py` (katso README:n luku Hienosäätö). Ajo onnistuu omalla koneella, kun muut muistia vievät ohjelmat on suljettu. Uudet äänitteet tulevat mukaan, kun ajo käynnistetään uudelleen.
+7. Kokoaa kuuntelusivun, jolla vertaat tallennettuja malleja ja valitset parhaan. Laajempi hienosäätö voidaan ajaa myöhemmin näytönohjaimella, esimerkiksi yliopiston GPU-palvelimella. Tästä sovitaan erikseen.
 
 ## 6. Hienosäädetyn mallin säilytys
 
