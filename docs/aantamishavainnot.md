@@ -196,7 +196,7 @@ Voikko jakaa yhdyssanan osiin: `saatetekstin` → `WORDBASES = +saate(saate)+tek
 
 ## Ehdotetut moduulimuutokset
 
-**Tilanne 12.11.2026:** E2 ja E6 ovat **käytössä** Juuson sokkokuuntelun perusteella. E3 on toteutettu, mutta se jäi pois päältä, koska h kuului usein h:na. Katso [Kuuntelukoe E2, E3 ja E6](#kuuntelukoe-e2-e3-ja-e6). Hienosäätöaineiston `metadata.csv` koottiin uudelleen (`--rebuild`), ja 251 tekstiä 273:sta muuttui, lähinnä alkukirjaimen osalta. Myös E1, E4, E5, E7 ja E8 ovat **käytössä** 12.11.2026 alkaen toisen sokkokokeen perusteella (katso [Kuuntelukoe E1, E4, E5, E7 ja E8](#kuuntelukoe-e1-e4-e5-e7-ja-e8)). `metadata.csv` koottiin niiden jälkeen uudelleen, ja 16 tekstiä 273:sta muuttui (esim. ”lues se”, ”kerror rauhassa”, ”tervettuloa”, ”rautatie-asema”). Seurattava: E8 lisää tavuviivan myös vakiintuneisiin sanoihin, kuten ”yli-opiston”, joka sanotaan yleensä yhteen. E9 (siemenvalintatila) on toteutettu 12.11.2026. Testaamatta ovat E10–E14.
+**Tilanne 12.11.2026:** E2 ja E6 ovat **käytössä** Juuson sokkokuuntelun perusteella. E3 on toteutettu, mutta se jäi pois päältä, koska h kuului usein h:na. Katso [Kuuntelukoe E2, E3 ja E6](#kuuntelukoe-e2-e3-ja-e6). Hienosäätöaineiston `metadata.csv` koottiin uudelleen (`--rebuild`), ja 251 tekstiä 273:sta muuttui, lähinnä alkukirjaimen osalta. Myös E1, E4, E5, E7 ja E8 ovat **käytössä** 12.11.2026 alkaen toisen sokkokokeen perusteella (katso [Kuuntelukoe E1, E4, E5, E7 ja E8](#kuuntelukoe-e1-e4-e5-e7-ja-e8)). `metadata.csv` koottiin niiden jälkeen uudelleen, ja 16 tekstiä 273:sta muuttui (esim. ”lues se”, ”kerror rauhassa”, ”tervettuloa”, ”rautatie-asema”). Seurattava: E8 lisää tavuviivan myös vakiintuneisiin sanoihin, kuten ”yli-opiston”, joka sanotaan yleensä yhteen. E9 (siemenvalintatila) ja E10 (taukojen enimmäispituus, valinnainen) on toteutettu 12.11.2026. Testaamatta ovat E11–E14.
 
 Jokainen odottaa Juuson päätöstä, ja jokainen testataan kuuntelukokeella ennen käyttöönottoa, kuten projektissa on tähän asti tehty: sama lause merkittynä ja merkitsemättä, useampi lause ja ilmiö kerrallaan.
 
@@ -211,7 +211,7 @@ Jokainen odottaa Juuson päätöstä, ja jokainen testataan kuuntelukokeella enn
 | E7 | **Käytössä 12.11.2026.** **Kahdennus yhdyssanan sisällä:** Voikon `WORDBASES` jakaa yhdyssanan, ja kun alkuosa on e-loppuinen nomini (saate, perhe, huone), jälkiosan alkukonsonantti kahdennetaan (”saatettekstin”). | Kohta 7: hyväksytty. | 5–6 yhdyssanaa (saateteksti, perhetuttu, huonekalu, kirjekuori, venematka). |
 | E8 | **Käytössä 12.11.2026.** **Tavuviiva yhdyssanan vokaalirajalle** (”pitopalvelu-yrittäjä”). | Kohta 5: hyväksytty yhdessä sanassa. Yleistys on epävarma. | Ensin koe 6–8 sanalla, joiden rajalla on vokaaliyhtymä. Otetaan käyttöön vain, jos virhe toistuu. |
 | E9 | **Toteutettu 12.11.2026** (`speak.py --seeds`, `f5fi.seed_takes`). **`--seeds`-tila** `speak.py`:hyn ja `f5fi`-moduuliin: jokaisen siemenen otto tallennetaan erikseen kuuntelua varten, ja kuuntelusivu kootaan automaattisesti. | Kohta 8: ainoa keino lausepainoon ennen hienosäätöä. Koulutusmateriaaleissa toteutettu `tools/f5_batch.py --seeds`. | Ei vaadi kuuntelukoetta, koska ei muuta ääntä. |
-| E10 | **Taukojen enimmäispituus** valinnaisena asetuksena (esim. `max_pause=0.15`), ei oletuksena. | Kohta 4: paransi useimpia lauseita, mutta ei kaikkia. | Ei tarvita, jos asetus on valinnainen. |
+| E10 | **Toteutettu 12.11.2026, valinnainen** (`speak.py --max-pause`, `--longest-pause`, `f5fi.cap_pauses`). **Taukojen enimmäispituus** valinnaisena asetuksena (esim. `max_pause=0.15`), ei oletuksena. | Kohta 4: paransi useimpia lauseita, mutta ei kaikkia. | Ei tarvita, jos asetus on valinnainen. |
 | E11 | **j-kahdennus ennen ja-sanaa luettelossa** pois (”ideoidaj ja”). | Kohta 8, sivuhavainto. Testaamatta. | Luettelolauseet j-merkinnällä ja ilman, samalla siemenellä. |
 | E12 | **e-sanan rajageminaatio sanarajalla:** perhe- ja huone-tyyppinen e-sana perusmuodossa kahdentaa myös seuraavan sanan alkukonsonantin (”ruokaohje löytyi” → ”ruokaohjel löytyi”). | Juuson huomio kokeessa 12.11.2026 (E8-5). Sama tunnistus kuin E7:ssä. | Lauseita, joissa e-sana on subjektina tai objektina ennen konsonanttia. |
 | E13 | **Kahdentavat seikkasanat**, esimerkiksi ”kiinni kaiteesta” → ”kiinnik kaiteesta”. | Juuson huomio kokeessa 12.11.2026 (E5-4). Voikko ei merkitse tätä, joten tarvitaan sanaluettelo. | Ensin luettelo sanoista, sitten koe. |
@@ -287,6 +287,20 @@ Päätelmät:
 - **Päätös 12.11.2026:** Juuso otti käyttöön kaikki viisi.
 
 E2:n myötä myös sivuhavainto kohdasta 2 korjaantui: moduuli merkitsee nyt molemmat kohdat (”ei kannatas syöttääp palveluun”), kun tekstiä ei merkitä käsin.
+
+### Koeajo E9 ja E10
+
+Siemenvalintatila (E9) ja taukojen enimmäispituus (E10) kokeiltiin 12.11.2026 kahdella sarjan 5 tyyppisellä lauseella (kansio `data/vertailu/2026-11-12_siemenvalinta/`, sivu `index.html`, tiedot `siemenet.json`). Malli oli perusmalli, viite `viite_selitys_2`.
+
+| Lause | Otot | Juuson valinta |
+|---|---|---|
+| lause01 ”Ilmiöstä käytetään nimeä metakognitiivinen laiskuus.” | siemenet 4–6 | siemen 4 |
+| lause02 ”Juna oli puoli tuntia myöhässä. Siksi ehdin lukea koko lehden.” | siemenet 4–5 | siemen 4 |
+| lause02-tauot015, sama lause, `--max-pause 0.15` | siemenet 4–5 | siemen 4 |
+
+- Juuso valitsi kaikista lauseista siemenen 4. Myös kohdan 8 kierroksella 7 siemen 4 valittiin kolmessa niistä neljästä lauseesta, joihin kelvollinen otto löytyi. Siemen 4 ei silti ole yleisesti paras, koska sama siemen antaa eri tekstillä eri prosodian.
+- Konnektiivi ”Siksi” tuli molemmissa lause02:n versioissa melko voimakkaasti. Juuson arvion mukaan se tasoittunee hienosäädössä.
+- Taukoraja lyhensi lause02:ssa virkkeiden välisen tauon 0,33 sekunnista 0,15 sekuntiin, koska lauseen ainoa tauko oli pisteen kohdalla. Juuso hyväksyi myös lyhennetyn version.
 
 ## Vertailuaineisto hienosäädetyn mallin arviointiin
 

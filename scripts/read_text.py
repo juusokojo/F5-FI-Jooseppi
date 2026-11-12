@@ -54,6 +54,7 @@ def main():
     g.add_argument("--paragraphs", type=int, help="read the first N paragraphs (title counts as one)")
     ap.add_argument("--candidates", type=int, default=3)
     ap.add_argument("--seed", type=int, default=1)
+    ap.add_argument("--max-pause", type=float, help="shorten pauses inside each sentence to at most this (e.g. 0.15)")
     args = ap.parse_args()
 
     os.makedirs(os.path.join(args.out, "lauseet"), exist_ok=True)
@@ -77,7 +78,8 @@ def main():
                 total += SENTENCE_PAUSE_S
             name = f"k{p_i + 1:02d}_l{s_i + 1:02d}"
             path = os.path.join(args.out, "lauseet", name + ".wav")
-            res = f5fi.synthesize(tts, args.ref, ref_text, sent, path, seed=args.seed, candidates=args.candidates)
+            res = f5fi.synthesize(tts, args.ref, ref_text, sent, path, seed=args.seed, candidates=args.candidates,
+                                  max_pause=args.max_pause)
             wave, sr = sf.read(path, dtype="float32")
             pieces.append(("wave", wave))
             total += len(wave) / sr
@@ -96,7 +98,7 @@ def main():
                 "ref": os.path.relpath(args.ref, f5fi.ROOT), "ckpt": os.path.relpath(args.ckpt, f5fi.ROOT),
                 "seed": args.seed, "candidates": args.candidates, "sentence_pause_s": SENTENCE_PAUSE_S,
                 "paragraph_pause_s": PARAGRAPH_PAUSE_S, "ref_pad_ms": f5fi.REF_PAD_MS, "tail_s": f5fi.TAIL_S,
-                "nfe": f5fi.NFE, "length_s": round(len(audio) / sr, 1), "sentences": rows}
+                "nfe": f5fi.NFE, "max_pause": args.max_pause, "length_s": round(len(audio) / sr, 1), "sentences": rows}
     with open(os.path.join(args.out, "asetukset.json"), "w", encoding="utf-8") as f:
         json.dump(settings, f, ensure_ascii=False, indent=1)
 

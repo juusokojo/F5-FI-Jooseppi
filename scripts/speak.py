@@ -33,6 +33,8 @@ def main():
     ap.add_argument("--ref-pad-ms", type=int, default=f5fi.REF_PAD_MS, help="silence after the reference (F5's own: 50)")
     ap.add_argument("--tail", type=float, default=f5fi.TAIL_S, help="extra seconds for the line (0 = F5's own estimate)")
     ap.add_argument("--raw", action="store_true", help="send the text without normalization")
+    ap.add_argument("--max-pause", type=float, help="shorten pauses inside the line to at most this many seconds (e.g. 0.15)")
+    ap.add_argument("--longest-pause", type=float, help="set the longest pause inside the line to this many seconds")
     ap.add_argument("--candidates", type=int, default=1,
                     help="takes to generate; local Whisper keeps the one closest to the text (e.g. 3)")
     ap.add_argument("--seeds", help="one take per seed into the folder --out, e.g. 4-11 or 4,6,9")
@@ -62,7 +64,8 @@ def main():
     if seeds:
         entry = f5fi.seed_takes(tts, args.ref, ref_text, args.text, args.out, seeds, name=args.name,
                                 whisper=not args.no_whisper, force=args.force, ckpt=args.ckpt, nfe=args.nfe,
-                                speed=args.speed, tail_s=args.tail, normalize=not args.raw)
+                                speed=args.speed, tail_s=args.tail, normalize=not args.raw,
+                                max_pause=args.max_pause, longest_pause=args.longest_pause)
         print(f"{entry['name']}: {len(entry['takes'])} ottoa, {time.time() - t1:.0f} s (laite {tts.device})")
         if entry["model_text"] and entry["model_text"] != args.text:
             print(f"mallille: {entry['model_text']}")
@@ -71,7 +74,8 @@ def main():
         print(f"kuuntelusivu: {os.path.join(args.out, f5fi.SEEDS_PAGE)}")
         return
     res = f5fi.synthesize(tts, args.ref, ref_text, args.text, args.out, nfe=args.nfe, speed=args.speed,
-                          seed=args.seed, tail_s=args.tail, normalize=not args.raw, candidates=args.candidates)
+                          seed=args.seed, tail_s=args.tail, normalize=not args.raw, candidates=args.candidates,
+                          max_pause=args.max_pause, longest_pause=args.longest_pause)
     t2 = time.time()
     print(f"{args.out}  (laite {tts.device}, lataus {t1 - t0:.1f} s, synteesi {t2 - t1:.1f} s)")
     if res.text != args.text:

@@ -133,6 +133,20 @@ Lausepaino, fokus ja luettelon sävelkulku vaihtelevat siemenen mukaan, mutta Wh
 
 Yksi otto kestää 15–25 sekuntia, joten kahdeksan siementä kestää noin kolme minuuttia lausetta kohden. Kun koneessa on samaan aikaan auki muistia vieviä ohjelmia (esimerkiksi Teams, Word ja selain), mallin muisti siirtyy levylle ja otto voi kestää kymmeniä minuutteja. Sulje silloin ylimääräiset ohjelmat.
 
+### Taukojen lyhentäminen
+
+```bash
+.venv/bin/python scripts/speak.py "Hän oli varma, että juna lähtee ajoissa." --max-pause 0.15 --out puhe.wav
+```
+
+Malli pitää pilkun kohdalla usein lähes pisteen pituisen tauon (0,22–0,38 s). Valitsin `--max-pause S` lyhentää lauseen sisäiset tauot enintään S sekuntiin, ja `--longest-pause S` asettaa lauseen pisimmän tauon täsmälleen S sekunnin pituiseksi, joko lyhentäen tai hiljaisuutta lisäten. Asetus on valinnainen eikä oletuksena päällä (E10 tiedostossa [aantamishavainnot.md](docs/aantamishavainnot.md)): kuuntelussa 0,15 sekunnin raja paransi useimpia lauseita, mutta päälauseiden välinen pilkku ("aikaa, ja aika on") ja luetteloa edeltävä pilkku ("varmana, esimerkiksi", 0,25 s) tarvitsivat pidemmän tauon.
+
+- **Tauko** on vähintään 0,1 sekunnin hiljaisuus, joka on 40 dB lauseen voimakkainta kohtaa hiljaisempi. Lyhyemmät hiljaisuudet, kuten kaksoiskonsonantin sulkeuma, jäävät ennalleen, samoin hiljaisuus lauseen alussa ja lopussa.
+- **Tauko lyhennetään keskeltä,** ja leikkauskohtiin tulee 5 ms:n häivytys, jotta leikkaus ei naksahda.
+- Valitsin toimii myös siemenvalinnan kanssa (`--seeds`) ja `read_text.py`:ssä (`--max-pause`). Pythonissa: `f5fi.synthesize(..., max_pause=0.15, longest_pause=0.25)` tai valmiille äänelle `f5fi.cap_pauses(wave, sr, 0.15)`.
+- Kun lause jaetaan kaksoispisteen kohdalta (E1), asetus koskee kumpaakin osaa. Kaksoispisteen tauko pysyy 0,3 sekunnissa.
+- **Raja koskee myös virkkeiden välistä taukoa,** jos samassa tekstissä on useampi virke. Kokeessa "Juna oli puoli tuntia myöhässä. Siksi ehdin lukea koko lehden." ainoa tauko oli pisteen kohdalla, ja se lyheni 0,33 sekunnista 0,15 sekuntiin. Anna virkkeet siksi erikseen. `read_text.py` tekee niin itse.
+
 ## Viitenäytteet ja vertailu
 
 ```bash

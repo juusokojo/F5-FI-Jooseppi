@@ -26,6 +26,9 @@ Fixes on top of F5's own inference, each found by listening tests (see README):
   synthesize(..., candidates=3) makes three takes and keeps the one local Whisper hears closest to the text.
   Stress and intonation also change with the seed, but Whisper does not hear them: seed_takes() keeps one take per
   seed and builds a listening page for choosing by ear (E9 in docs/aantamishavainnot.md).
+- Pauses (optional, off by default): synthesize(..., max_pause=0.15) shortens the pauses inside a line to at most
+  that many seconds, and longest_pause sets the longest one to exactly its value (E10). In listening 10.-11.11.2026
+  a 0.15 s cap improved most lines, but a comma between main clauses or before a list needed a longer pause.
 """
 import difflib
 import html
@@ -61,6 +64,10 @@ REF_PAD_MS = 600
 TAIL_S = 0.3  # extra time for the generated line; trailing silence is trimmed afterwards
 SHORT_BYTES = 10  # below this F5 slows the line to speed 0.3 itself; that is left as it is
 NFE = 32
+PAUSE_BELOW_PEAK_DB = 40.0  # a pause is quieter than the loudest 5 ms frame by this much (as _trim_tail)
+PAUSE_MIN_S = 0.1  # shorter quiet runs are closures and word joins, not pauses
+PAUSE_FRAME_S = 0.005
+FADE_S = 0.005  # at every cut, so a cut never clicks
 WHISPER = "mlx-community/whisper-large-v3-turbo"  # for candidates; already in the Hugging Face cache
 
 _ref_pad_ms = REF_PAD_MS
@@ -221,7 +228,7 @@ def split_colon(text, lower=None):
 
 
 def synthesize(tts, ref, ref_text, text, out, nfe=NFE, speed=1.0, seed=1, tail_s=TAIL_S, normalize=True,
-               candidates=1, colon_split=None):
+               candidates=1, colon_split=None, max_pause=None, longest_pause=None):
     """Write `text` spoken in the voice of `ref` to `out` (wav).
 
     candidates > 1 generates that many takes (seeds seed, seed+1, ...), has local Whisper transcribe each and keeps
@@ -229,6 +236,9 @@ def synthesize(tts, ref, ref_text, text, out, nfe=NFE, speed=1.0, seed=1, tail_s
     10 bytes get one take: Whisper hears one-word lines wrong even when they are right. Stops early on a perfect take.
 
     colon_split (default COLON_SPLIT, only with normalize): say the parts around ': ' as separate takes (E1).
+
+    max_pause / longest_pause (seconds, default off): see cap_pauses (E10). With a colon split they apply to each part;
+    the pause at the colon stays COLON_GAP_S.
     """
     if colon_split is None:
         colon_split = COLON_SPLIT and normalize
@@ -239,7 +249,7 @@ def synthesize(tts, ref, ref_text, text, out, nfe=NFE, speed=1.0, seed=1, tail_s
         waves, takes, first_seed = [], [], None
         for p in parts:
             wave, sr, s, t = _synth_one(tts, ref, ref_text, p, nfe, speed, seed, tail_s, candidates)
-            waves.append(wave)
+            waves.append(cap_pauses(wave, sr, max_pause, longest_pause))
             takes += t
             first_seed = s if first_seed is None else first_seed
         joined = []
@@ -253,7 +263,7 @@ def synthesize(tts, ref, ref_text, text, out, nfe=NFE, speed=1.0, seed=1, tail_s
         sf.write(out, np.concatenate(joined), sr)
         return Result(" | ".join(parts), first_seed, takes)
     wave, sr, s, t = _synth_one(tts, ref, ref_text, text, nfe, speed, seed, tail_s, candidates)
-    sf.write(out, wave, sr)
+    sf.write(out, cap_pauses(wave, sr, max_pause, longest_pause), sr)
     return Result(text, s, t)
 
 
@@ -278,6 +288,69 @@ def _synth_one(tts, ref, ref_text, text, nfe, speed, seed, tail_s, candidates):
         if sc >= 1.0:
             break
     return best[2], best[3], best[1], takes
+
+
+def find_pauses(wave, sr, min_s=PAUSE_MIN_S, below_peak_db=PAUSE_BELOW_PEAK_DB, frame_s=PAUSE_FRAME_S):
+    """Pauses inside a line as [(start_s, end_s)]: quiet runs of at least min_s. Silence at the start or end of the
+    line is not a pause."""
+    frame = max(1, int(round(sr * frame_s)))
+    n = len(wave) // frame
+    if n == 0:
+        return []
+    rms = np.sqrt(np.mean(np.asarray(wave[: n * frame], dtype=np.float64).reshape(n, frame) ** 2, axis=1))
+    db = 20 * np.log10(rms + 1e-9)
+    quiet = db < db.max() - below_peak_db
+    pauses, i = [], 0
+    while i < n:
+        if not quiet[i]:
+            i += 1
+            continue
+        j = i
+        while j < n and quiet[j]:
+            j += 1
+        if i > 0 and j < n and (j - i) * frame >= min_s * sr - 1e-6:
+            pauses.append((i * frame / sr, j * frame / sr))
+        i = j
+    return pauses
+
+
+def cap_pauses(wave, sr, max_s=None, longest_s=None):
+    """`wave` with each pause inside it (find_pauses) cut to at most max_s seconds from its middle (E10). With
+    longest_s the longest pause is set to exactly that length instead, shortened or lengthened with silence, for a
+    comma that needs its pause ("varmana, esimerkiksi ..."). Unchanged when both are None."""
+    if max_s is None and longest_s is None:
+        return wave
+    pauses = find_pauses(wave, sr)
+    ops = [[s, e, e - s if max_s is None else min(e - s, max_s)] for s, e in pauses]
+    if longest_s is not None and ops:
+        ops[max(range(len(ops)), key=lambda k: ops[k][1] - ops[k][0])][2] = longest_s
+    pieces, at = [], 0
+    for s, e, target in ops:
+        d = e - s
+        if abs(target - d) < 0.005:
+            continue
+        if target < d:
+            a, b = int(round((s + target / 2) * sr)), int(round((e - target / 2) * sr))
+            pieces.append(wave[at:a])
+            at = b
+        else:
+            mid = int(round((s + e) / 2 * sr))
+            pieces += [wave[at:mid], np.zeros(int(round((target - d) * sr)), dtype=wave.dtype)]
+            at = mid
+    if not pieces:
+        return wave
+    pieces.append(wave[at:])
+    fade = int(FADE_S * sr)
+    out = []
+    for k, p in enumerate(pieces):
+        p = np.array(p, copy=True)
+        if len(p) > 2 * fade and p.any():
+            if k > 0:
+                p[:fade] *= np.linspace(0, 1, fade, dtype=p.dtype)
+            if k < len(pieces) - 1:
+                p[-fade:] *= np.linspace(1, 0, fade, dtype=p.dtype)
+        out.append(p)
+    return np.concatenate(out)
 
 
 SEEDS_FILE = "siemenet.json"  # what seed_takes() has made in a folder; the page is built from it
@@ -315,7 +388,7 @@ def seed_takes(tts, ref, ref_text, text, out_dir, seeds, name=None, whisper=True
     data = _load_seeds(out_dir)
     kw.pop("candidates", None)
     settings = {"ref": os.path.abspath(ref), "ckpt": os.path.abspath(ckpt) if ckpt else None,
-                **{k: kw[k] for k in sorted(kw)}}
+                **{k: kw[k] for k in sorted(kw) if kw[k] is not None}}  # an option left out is not a change
     entry = next((e for e in data["lauseet"] if e["text"] == text and (name is None or e["name"] == name)), None)
     if entry is None:
         used = {e["name"] for e in data["lauseet"]}

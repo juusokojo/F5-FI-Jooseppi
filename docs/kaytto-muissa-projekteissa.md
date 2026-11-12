@@ -100,7 +100,7 @@ Huomioita:
 - **`--raw` ohittaa myös kaksoispisteen jaon.** Jos haluat jakaa raakatekstin, jaa se itse ja liitä osat 0,3 sekunnin tauolla.
 - **Käsin merkitty sana katkaisee moduulin merkinnän.** Moduuli tunnistaa sanat Voikolla, eikä Voikko tunne käsin merkittyjä muotoja, kuten "kirjoittaas". Jos merkitset sanan käsin, moduuli ei enää tunnista sitä seuraavan sanan laukaisijaksi. Kirjoita silloin myös seuraava kahdennus käsin.
 - **Jos kieltomuodon kahdennus kuulostaa väärältä,** anna lause valitsimella `--raw` ja kirjoita teksti itse. Sokkokokeessa "ei kannatat tehdä" oli ainoa merkitty lause, joka kuulosti huonommalta.
-- **Pilkun tauot:** lauseen sisäisten taukojen lyhentäminen jälkikäsittelyssä enintään 0,15 sekuntiin paransi useimpia lauseita. Päälauseiden välinen pilkku ("aikaa, ja aika on") ja luetteloa edeltävä pilkku ("varmana, esimerkiksi", 0,25 s) tarvitsivat kuitenkin pidemmän tauon. Kuuntele ennen kuin lyhennät.
+- **Pilkun tauot:** lauseen sisäisten taukojen lyhentäminen enintään 0,15 sekuntiin paransi useimpia lauseita. Moduuli tekee sen pyydettäessä: `speak.py --max-pause 0.15` tai `f5fi.synthesize(..., max_pause=0.15)`. Päälauseiden välinen pilkku ("aikaa, ja aika on") ja luetteloa edeltävä pilkku ("varmana, esimerkiksi", 0,25 s) tarvitsivat kuitenkin pidemmän tauon. Silloin jätä raja pois tai anna lisäksi `--longest-pause 0.25` (`longest_pause=0.25`), joka asettaa lauseen pisimmän tauon juuri tuon mittaiseksi. Asetus ei ole oletuksena päällä. Kuuntele ennen kuin lyhennät.
 
 ## Siemenvalinta lausepainoa ja intonaatiota varten
 
