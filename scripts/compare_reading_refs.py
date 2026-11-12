@@ -30,10 +30,11 @@ def main():
     ap.add_argument("--text", required=True)
     ap.add_argument("--paragraphs", type=int, default=2, help="first N paragraphs, the title counts as one")
     ap.add_argument("--out", required=True)
-    ap.add_argument("--ckpt", default=f5fi.BASE_CKPT)
+    ap.add_argument("--ckpt", help="model checkpoint; default: the recommended fine-tuned model (f5fi.FINETUNED_CKPT), base = the base model")
     ap.add_argument("--candidates", type=int, default=1)
     ap.add_argument("--seed", type=int, default=1)
     args = ap.parse_args()
+    args.ckpt = f5fi.resolve_ckpt(args.ckpt)
     os.makedirs(args.out, exist_ok=True)
 
     with open(args.text, encoding="utf-8") as f:

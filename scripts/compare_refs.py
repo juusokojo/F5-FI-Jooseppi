@@ -27,10 +27,11 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("refs")
     ap.add_argument("--out", required=True)
-    ap.add_argument("--ckpt", default=f5fi.BASE_CKPT)
+    ap.add_argument("--ckpt", help="model checkpoint; default: the recommended fine-tuned model (f5fi.FINETUNED_CKPT), base = the base model")
     ap.add_argument("--nfe", type=int, default=f5fi.NFE)
     ap.add_argument("--candidates", type=int, default=1, help="takes per line; Whisper keeps the closest")
     args = ap.parse_args()
+    args.ckpt = f5fi.resolve_ckpt(args.ckpt)
     os.makedirs(args.out, exist_ok=True)
 
     tts = f5fi.load_model(args.ckpt)

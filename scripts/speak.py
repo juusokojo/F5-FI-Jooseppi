@@ -8,8 +8,8 @@
 stress and intonation by ear (f5fi.seed_takes). Run it again with another text and the same folder to add a
 sentence to the same page; takes that already exist are not made again.
 
-Without --ref, the recommended reference f5fi.DEFAULT_REF is used. --ckpt picks a fine-tuned checkpoint
-from checkpoints/ instead of the base model. Text normalization and inference fixes are in f5fi.py.
+Without --ref, the recommended reference f5fi.DEFAULT_REF is used, and without --ckpt the recommended
+fine-tuned model f5fi.FINETUNED_CKPT (--ckpt base for the base model, or a path to another checkpoint). Text normalization and inference fixes are in f5fi.py.
 """
 import argparse
 import os
@@ -26,7 +26,7 @@ def main():
     ap.add_argument("--out", required=True, help="output .wav, or a folder with --seeds")
     ap.add_argument("--ref", default=f5fi.DEFAULT_REF, help="reference clip whose voice is copied (default: f5fi.DEFAULT_REF)")
     ap.add_argument("--ref-text", help="words of the reference clip (default: the .txt next to it)")
-    ap.add_argument("--ckpt", default=f5fi.BASE_CKPT, help="model checkpoint")
+    ap.add_argument("--ckpt", help="model checkpoint; default: the recommended fine-tuned model (f5fi.FINETUNED_CKPT), base = the base model")
     ap.add_argument("--nfe", type=int, default=f5fi.NFE, help="flow steps: 16 is about twice as fast, 32 default")
     ap.add_argument("--speed", type=float, default=1.0)
     ap.add_argument("--seed", type=int, default=1)
@@ -42,6 +42,7 @@ def main():
     ap.add_argument("--no-whisper", action="store_true", help="with --seeds: no Whisper note per take")
     ap.add_argument("--force", action="store_true", help="with --seeds: make existing takes again")
     args = ap.parse_args()
+    args.ckpt = f5fi.resolve_ckpt(args.ckpt)
     if args.seeds and args.candidates > 1:
         ap.error("--seeds and --candidates exclude each other: Whisper cannot pick stress, so --seeds keeps every take")
     seeds = None

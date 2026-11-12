@@ -48,7 +48,7 @@ def main():
     ap.add_argument("text")
     ap.add_argument("--ref", default=f5fi.DEFAULT_REF, help="default: f5fi.DEFAULT_REF")
     ap.add_argument("--out", required=True)
-    ap.add_argument("--ckpt", default=f5fi.BASE_CKPT)
+    ap.add_argument("--ckpt", help="model checkpoint; default: the recommended fine-tuned model (f5fi.FINETUNED_CKPT), base = the base model")
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--until-s", type=float, help="stop after the paragraph that passes this many seconds")
     g.add_argument("--paragraphs", type=int, help="read the first N paragraphs (title counts as one)")
@@ -56,6 +56,7 @@ def main():
     ap.add_argument("--seed", type=int, default=1)
     ap.add_argument("--max-pause", type=float, help="shorten pauses inside each sentence to at most this (e.g. 0.15)")
     args = ap.parse_args()
+    args.ckpt = f5fi.resolve_ckpt(args.ckpt)
 
     os.makedirs(os.path.join(args.out, "lauseet"), exist_ok=True)
     with open(os.path.splitext(args.ref)[0] + ".txt", encoding="utf-8") as f:

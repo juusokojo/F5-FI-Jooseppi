@@ -33,7 +33,7 @@ Koneella ei ole FFmpegiä. Siksi `scripts/f5fi.py` lukee viiteäänitteet soundf
 .venv/bin/python scripts/speak.py "Tekstiä puheeksi." --out puhe.wav
 ```
 
-Ilman `--ref`-valitsinta `speak.py` ja `read_text.py` käyttävät suositusviitettä `data/viite/v3/viite_selitys_2.wav`. Se on määritelty yhdessä paikassa, vakiossa `f5fi.DEFAULT_REF`, joten suosituksen vaihtuessa riittää muuttaa sitä. Mallin mukana tullut viite on vakiossa `f5fi.BUNDLED_REF`. Omalla viiteäänitteellä komento on tällainen: `--ref oma.wav --ref-text "Mitä viitteessä sanotaan."`. Hienosäädetyn version saa käyttöön valitsimella `--ckpt checkpoints/<tiedosto>`.
+Ilman `--ref`-valitsinta `speak.py` ja `read_text.py` käyttävät suositusviitettä `data/viite/v3/viite_selitys_2.wav`. Se on määritelty yhdessä paikassa, vakiossa `f5fi.DEFAULT_REF`, joten suosituksen vaihtuessa riittää muuttaa sitä. Mallin mukana tullut viite on vakiossa `f5fi.BUNDLED_REF`. Omalla viiteäänitteellä komento on tällainen: `--ref oma.wav --ref-text "Mitä viitteessä sanotaan."`. Samoin ilman `--ckpt`-valitsinta käytössä on suositeltu hienosäädetty malli (`f5fi.FINETUNED_CKPT`, nyt `checkpoints/oma-v1/malli_002000.safetensors`). Jos tiedostoa ei ole, esimerkiksi GitHubista kloonatussa repossa, käytetään perusmallia ja tulostetaan huomautus. Perusmallin saa valitsimella `--ckpt base`, ja muun mallin valitsimella `--ckpt <polku>`.
 
 M3-Macilla yhden lyhyen lauseen tuottaminen kestää noin 20 sekuntia (MPS, 32 askelta). Valitsimella `--nfe 16` tuottaminen on noin kaksi kertaa nopeampaa.
 
@@ -261,13 +261,13 @@ Aineiston merkit sisältyvät perusmallin sanastoon, joten hienosäätö voi jat
 | `tila.pt` | Ajon jatkamiseen tarvittava tila (painot, optimoija ja keskiarvomalli). Tiedosto korvataan jokaisella tallennuksella. |
 | `asetukset.json` | Asetukset ja jokainen ajokerta: pätkien määrä, minuutit ja laite. |
 
-**Mallin valinta.** Avaa `checkpoints/<nimi>/index.html` ja kuuntele sarakkeet vasemmalta oikealle. Äänen pitäisi muuttua omaksesi ja pysyä selkeänä. Jos myöhempi malli alkaa sotkea sanoja tai lukea tasaisemmin, valitse aiempi malli. Validointihäviö lasketaan pätkistä, joita malli ei ole nähnyt, ja se on vain vihje: kuuntelu ratkaisee. Valittu malli otetaan käyttöön valitsimella `--ckpt`:
+**Mallin valinta.** Avaa `checkpoints/<nimi>/index.html` ja kuuntele sarakkeet vasemmalta oikealle. Äänen pitäisi muuttua omaksesi ja pysyä selkeänä. Jos myöhempi malli alkaa sotkea sanoja tai lukea tasaisemmin, valitse aiempi malli. Validointihäviö lasketaan pätkistä, joita malli ei ole nähnyt, ja se on vain vihje: kuuntelu ratkaisee. Ehdokasta voi kokeilla valitsimella `--ckpt`, ja valittu malli asetetaan oletukseksi vakiossa `f5fi.FINETUNED_CKPT`:
 
 ```bash
-.venv/bin/python scripts/speak.py "Tekstiä puheeksi." --ckpt checkpoints/oma-v1/malli_002000.safetensors --out puhe.wav
+.venv/bin/python scripts/speak.py "Tekstiä puheeksi." --ckpt checkpoints/oma-v2/malli_002000.safetensors --out puhe.wav
 ```
 
-Ensimmäisessä ajossa (`oma-v1`, 12.11.2026) validointihäviö laski 0,96:sta 0,67:ään ja tasaantui 2 000 askeleen jälkeen. Kuuntelussa askel 2000 oli paras, joten se jätettiin ja muut mallit sekä `tila.pt` poistettiin.
+Ensimmäisessä ajossa (`oma-v1`, 12.11.2026) validointihäviö laski 0,96:sta 0,67:ään ja tasaantui 2 000 askeleen jälkeen. Kuuntelussa askel 2000 oli paras, joten se jätettiin ja muut mallit sekä `tila.pt` poistettiin. Malli on nyt oletuksena kaikkialla.
 
 **Kesto ja levytila.** Oletusasetuksilla (3 000 askelta) ajo kestää M3-Macilla noin kaksi ja puoli tuntia. Jokainen tallennettu malli vie 1,35 Gt ja `tila.pt` 5,4 Gt, joten 3 000 askeleen ajo vie noin 14 Gt. Mallit, joita et valitse, voi poistaa.
 

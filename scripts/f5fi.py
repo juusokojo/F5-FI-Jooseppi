@@ -3,7 +3,7 @@
 Used by speak.py, compare_refs.py and other projects:
 
     from f5fi import load_model, synthesize
-    tts = load_model()
+    tts = load_model()  # the recommended fine-tuned model; load_model("base") for the base model
     synthesize(tts, "ref.wav", "Viitteen sanat.", "Tekstiä puheeksi.", "out.wav", candidates=3)
 
 Fixes on top of F5's own inference, each found by listening tests (see README):
@@ -56,6 +56,10 @@ VOCAB = os.path.join(BASE, "vocab.txt")
 # when no reference is given. Its words are in the .txt next to it.
 DEFAULT_REF = os.path.join(ROOT, "data", "viite", "v3", "viite_selitys_2.wav")
 BUNDLED_REF = os.path.join(BASE, "AsmoKoskinenRef_v1.wav")  # the clip that came with the base model
+# The one place that picks the recommended model, chosen by listening (2026-11-12: step 2000 of the first
+# fine-tuning run). load_model(), speak.py, read_text.py and other projects use it when no checkpoint is given.
+# The weights are not in the git repo; where the file is missing, the base model is used with a note.
+FINETUNED_CKPT = os.path.join(ROOT, "checkpoints", "oma-v1", "malli_002000.safetensors")
 
 LOWER_FIRST = True  # see lower_first()
 COLON_SPLIT = True  # E1 in docs/aantamishavainnot.md, on since 2026-11-12 (better in 3 of 5): split at ": ", join with a pause
@@ -120,7 +124,22 @@ def normalize_text(text, geminate=True, lower=None):
     return text.replace("Ä", "ä").replace("Ö", "ö").replace("Å", "å")
 
 
-def load_model(ckpt=BASE_CKPT, ref_pad_ms=REF_PAD_MS):
+def resolve_ckpt(ckpt=None):
+    """Checkpoint path: None -> the recommended fine-tuned model (the base model if it is missing), "base" -> base."""
+    if ckpt == "base":
+        return BASE_CKPT
+    if ckpt is not None:
+        return ckpt
+    if os.path.exists(FINETUNED_CKPT):
+        return FINETUNED_CKPT
+    print(f"huom: hienosäädettyä mallia {os.path.relpath(FINETUNED_CKPT, ROOT)} ei ole, käytetään perusmallia",
+          file=sys.stderr)
+    return BASE_CKPT
+
+
+def load_model(ckpt=None, ref_pad_ms=REF_PAD_MS):
+    """F5 with the fixes below. ckpt: None = the recommended fine-tuned model, "base" = the base model, or a path."""
+    ckpt = resolve_ckpt(ckpt)
     global _ref_pad_ms
     _ref_pad_ms = ref_pad_ms
     from f5_tts.api import F5TTS
