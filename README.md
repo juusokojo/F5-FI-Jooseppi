@@ -253,6 +253,12 @@ F5:n valmistelutyökalu (`f5_tts.train.datasets.prepare_csv_wavs`) etsii sanasto
 - Lisenssi: molempien painot on julkaistu lisenssillä CC BY-NC 4.0. Perusmallin rajoite johtuu koulutusaineistosta Emilia. F5-TTS:n koodi ja Vocos-vokooderi ovat MIT-lisenssin alaisia. Ei-kaupallinen käyttö on sallittua myös verkossa, kun tekijät ja lisenssi mainitaan. Hienosäädetty checkpoint on muokattu versio, joten sitä koskee sama lisenssi. Mallin tuottaman puheen kaupallinen käyttö on harmaa alue.
 - Mallin mukana tullut viiteäänite `AsmoKoskinenRef_v1.wav` on oikean ihmisen ääni, eikä sille ole erillistä lupaa. Käytä muille jaettavaan aineistoon omaa viitettä.
 
+## Lisenssit
+
+- **Lähdekoodi:** MIT, katso [LICENSE](LICENSE).
+- **Jooseppi-ääni**, eli hienosäädetyt painot ja viitenäytteet: painot on lisensoitu CC BY-NC 4.0 -lisenssillä, ja äänen käytölle on annettu erillinen lupa. Molemmat on kuvattu tiedostossa [AANI-JA-MALLI.md](AANI-JA-MALLI.md). Painoja ja ääniä ei ole tässä repositoriossa.
+- **Perusmalli ja riippuvuudet:** katso kohta Mallin tiedot yllä.
+
 ## Vaihtoehtoinen perusmalli: VoxCPM2
 
 [openbmb/VoxCPM2](https://huggingface.co/openbmb/VoxCPM2) on tarkoitettu tilanteisiin, joissa tarvitaan sallivampi lisenssi. Painot ja koodi on julkaistu lisenssillä Apache-2.0, joka sallii myös kaupallisen käytön. Malli tukee suomea ilman kielitunnistetta. Hienosäätöön on valmiit skriptit (kokonainen hienosäätö ja LoRA), ja mallikortin mukaan 5–10 minuuttia ääntä riittää. Mallikortti kieltää käyttämästä toisen ihmisen ääntä luvatta.
