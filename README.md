@@ -267,7 +267,7 @@ Aineiston merkit sisältyvät perusmallin sanastoon, joten hienosäätö voi jat
 .venv/bin/python scripts/speak.py "Tekstiä puheeksi." --ckpt checkpoints/oma-v2/malli_002000.safetensors --out puhe.wav
 ```
 
-Ensimmäisessä ajossa (`oma-v1`, 12.11.2026) validointihäviö laski 0,96:sta 0,67:ään ja tasaantui 2 000 askeleen jälkeen. Kuuntelussa askel 2000 oli paras, joten se jätettiin ja muut mallit sekä `tila.pt` poistettiin. Malli on nyt oletuksena kaikkialla. Vertailussa neljällä aineistoon kuulumattomalla lauseella (`data/vertailu/2026-11-12_oletusmalli`, sama viite ja siemen) hienosäädetty malli oli käyttäjän korvaan parempi kuin perusmalli kaikissa lauseissa.
+Ensimmäisessä ajossa (`oma-v1`, 12.11.2026) validointihäviö laski 0,96:sta 0,67:ään ja tasaantui 2 000 askeleen jälkeen. Kuuntelussa askel 2000 oli paras, joten se jätettiin ja muut mallit sekä `tila.pt` poistettiin. Malli on nyt oletuksena kaikkialla. Vertailussa neljällä aineistoon kuulumattomalla lauseella (`data/vertailu/2026-11-12_oletusmalli`, sama viite ja siemen) hienosäädetty malli oli käyttäjän korvaan parempi kuin perusmalli kaikissa lauseissa. Se toimii myös toisen puhujan viitteellä: naisäänen viitteillä (Rooliharjoittelu, kiihtymystasot 3, 6 ja 8) äänen väri tummui hieman mutta pysyi selvästi naisen äänenä, kiihtymys kuului merkittävästi paremmin ja kieli oli hivenen parempi kuin perusmallilla.
 
 **Kesto ja levytila.** Oletusasetuksilla (3 000 askelta) ajo kestää M3-Macilla noin kaksi ja puoli tuntia. Jokainen tallennettu malli vie 1,35 Gt ja `tila.pt` 5,4 Gt, joten 3 000 askeleen ajo vie noin 14 Gt. Mallit, joita et valitse, voi poistaa.
 
