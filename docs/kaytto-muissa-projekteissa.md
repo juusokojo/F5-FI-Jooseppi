@@ -1,13 +1,13 @@
 # F5-fi: käyttö muissa projekteissa
 
-Tämä ohje on tarkoitettu Claude Code -istunnolle, joka tuottaa toisessa projektissa suomenkielistä puhetta käyttäjän äänellä. Ohje on päivitetty 2026-11-11.
+Tämä ohje on tarkoitettu Claude Code -istunnolle, joka tuottaa toisessa projektissa suomenkielistä puhetta käyttäjän äänellä. Ohje on päivitetty 2026-11-12.
 
 ## Tilanne
 
 - Malli on F5-TTS Finnishin perusmalli, jota **ei ole vielä hienosäädetty**. Kansiossa `checkpoints/` ei ole vielä mitään. Käyttäjän ääni tulee lyhyestä viitenäytteestä, jota malli matkii.
 - Kielen laatu on hyvä. Heikkouksia ovat tasainen eläytyminen ja se, että äänen väri ei ole aivan käyttäjän oma.
 - Moduuli `scripts/f5fi.py` korjaa tekstiä ennen synteesiä ja säätää F5:n omaa käsittelyä. Korjaukset on hyväksytty kuuntelukokeissa, ja ne ovat oletuksena päällä. Niitä ei tarvitse eikä pidä tehdä itse.
-- Kuuntelussa on löytynyt virheitä, joita moduuli ei vielä korjaa. Ne korjataan mallille annettavassa tekstissä, katso [Kirjoitusasukorjaukset, joita moduuli ei vielä tee](#kirjoitusasukorjaukset-joita-moduuli-ei-vielä-tee). Havainnot perusteluineen ovat tiedostossa `$F5/docs/aantamishavainnot.md`.
+- Kuuntelussa on löytynyt virheitä, joita moduuli ei vielä korjaa (moduuli korjaa 12.11.2026 alkaen myös käskymuodon, luettelon ja yhdyssanojen kahdennukset, yhdyssanan vokaalirajan ja kaksoispisteen tauon). Ne korjataan mallille annettavassa tekstissä, katso [Kirjoitusasukorjaukset, joita moduuli ei vielä tee](#kirjoitusasukorjaukset-joita-moduuli-ei-vielä-tee). Havainnot perusteluineen ovat tiedostossa `$F5/docs/aantamishavainnot.md`.
 
 ## Säännöt
 
@@ -84,22 +84,20 @@ Rooliharjoittelu-projekti käyttää mallia polun `models/f5-fi` kautta. Polku o
 
 ## Kirjoitusasukorjaukset, joita moduuli ei vielä tee
 
-Nämä korjaukset hyväksyttiin kuuntelussa Koulutusmateriaalit-projektissa 10.–11.11.2026. Moduuliin niitä ei ole vielä viety: osa odottaa f5-fi:n omaa kuuntelukoetta, ja h vokaalin edellä hylättiin yleissääntönä, koska h kuului usein oikeana h:na. Siksi korjaukset tehdään tekstiin, joka annetaan mallille. Pieni alkukirjain ja kahdennus kieltomuodon jälkeen siirtyivät moduuliin 12.11.2026, joten niitä ei enää kirjoiteta itse. Näytettävä teksti (tekstitys, käsikirjoitus) pidetään oikeinkirjoitettuna, joten pidä mallin teksti erillisessä kentässä.
+Nämä korjaukset hyväksyttiin kuuntelussa Koulutusmateriaalit-projektissa 10.–11.11.2026. Suurin osa niistä siirtyi moduuliin f5-fi:n omien sokkokokeiden jälkeen 12.11.2026, joten niitä **ei enää kirjoiteta itse**: pieni alkukirjain, kahdennus kieltomuodon ja käskymuodon jälkeen sekä luettelossa, kahdennus yhdyssanan sisällä ("saatettekstin"), tavuviiva yhdyssanan vokaalirajalle ("pitopalvelu-yrittäjä") ja kaksoispisteen jako kahdeksi otoksi. Alla ovat ne, joita moduuli ei tee. h vokaalin edellä hylättiin yleissääntönä, koska h kuului usein oikeana h:na. Nämä korjaukset tehdään tekstiin, joka annetaan mallille. Näytettävä teksti (tekstitys, käsikirjoitus) pidetään oikeinkirjoitettuna, joten pidä mallin teksti erillisessä kentässä.
 
 Käytä korjausta vain, kun käyttäjä kuulee virheen. Älä tee niitä kaikkiin lauseisiin etukäteen.
 
 | Virhe kuuntelussa | Kirjoitusasu mallille | Esimerkki |
 |---|---|---|
 | Sanat liimautuvat yhteen, kun seuraava sana alkaa vokaalilla (kurkkusulkeuma puuttuu) | h laukaisevan sanan loppuun. Kuuntele tulos: h voi kuulua oikeana h:na ("hikkunan"). Heittomerkki, pilkku, viiva ja k hylättiin. | "ei tarvitseh ymmärtää", "pitää ymmärtääh itse" |
-| Rajageminaatio puuttuu luettelossa pilkun jälkeen | Sama | "voi ehdottaa …, kirjoittaas saatetekstin" |
-| Rajageminaatio puuttuu muualla | Sama | "tavoitteena on päättäät tietoisesti", "kysyk kolme asiaa" |
-| Kahdennus puuttuu yhdyssanan sisältä, kun alkuosa on e-loppuinen (saate, perhe, huone) | Kahdennus kirjoitettuna sanan sisään | "saatettekstin" |
-| Yhdyssanan rajan vokaali katoaa | Tavuviiva rajalle | "pitopalvelu-yrittäjä" |
-| Kaksoispisteen jälkeen ei taukoa | Lause jaetaan kaksoispisteen kohdalta kahdeksi otoksi, ja osat liitetään 0,3 sekunnin tauolla. | "Käytännössä esität itsellesi kysymyksiä." + 0,3 s + "Miksi käytän tekoälyä juuri tässä?" |
+| Rajageminaatio puuttuu kohdassa, jota moduuli ei tunnista (adverbi, infinitiivi ilman hallitsevaa verbiä, sana jolla on myös substantiivitulkinta) | Seuraavan sanan alkukonsonantti laukaisevan sanan loppuun | "tavoitteena on päättäät tietoisesti", "kiinnik kaiteesta", "kertoat taustan" |
 | Pilkun kohdalla pisteen kaltainen tauko ja lasku ennen sivulausetta | Pilkku pois mallin tekstistä | "palveluun miettimättä käytetäänkö" |
 
 Huomioita:
 
+- **Aiemmin käsin korjatut tekstit toimivat yhä.** Moduuli ei kahdenna uudelleen sanaa, jonka olet jo merkinnyt ("saatettekstin", "kysyk"), eikä lisää toista tavuviivaa. Uusiin teksteihin näitä ei kuitenkaan enää kirjoiteta itse.
+- **`--raw` ohittaa myös kaksoispisteen jaon.** Jos haluat jakaa raakatekstin, jaa se itse ja liitä osat 0,3 sekunnin tauolla.
 - **Käsin merkitty sana katkaisee moduulin merkinnän.** Moduuli tunnistaa sanat Voikolla, eikä Voikko tunne käsin merkittyjä muotoja, kuten "kirjoittaas". Jos merkitset sanan käsin, moduuli ei enää tunnista sitä seuraavan sanan laukaisijaksi. Kirjoita silloin myös seuraava kahdennus käsin.
 - **Jos kieltomuodon kahdennus kuulostaa väärältä,** anna lause valitsimella `--raw` ja kirjoita teksti itse. Sokkokokeessa "ei kannatat tehdä" oli ainoa merkitty lause, joka kuulosti huonommalta.
 - **Pilkun tauot:** lauseen sisäisten taukojen lyhentäminen jälkikäsittelyssä enintään 0,15 sekuntiin paransi useimpia lauseita. Päälauseiden välinen pilkku ("aikaa, ja aika on") ja luetteloa edeltävä pilkku ("varmana, esimerkiksi", 0,25 s) tarvitsivat kuitenkin pidemmän tauon. Kuuntele ennen kuin lyhennät.

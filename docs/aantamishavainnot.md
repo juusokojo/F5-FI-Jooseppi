@@ -196,20 +196,20 @@ Voikko jakaa yhdyssanan osiin: `saatetekstin` → `WORDBASES = +saate(saate)+tek
 
 ## Ehdotetut moduulimuutokset
 
-**Tilanne 12.11.2026:** E2 ja E6 ovat **käytössä** Juuson sokkokuuntelun perusteella. E3 on toteutettu, mutta se jäi pois päältä, koska h kuului usein h:na. Katso [Kuuntelukoe E2, E3 ja E6](#kuuntelukoe-e2-e3-ja-e6). Hienosäätöaineiston `metadata.csv` koottiin uudelleen (`--rebuild`), ja 251 tekstiä 273:sta muuttui, lähinnä alkukirjaimen osalta. E1, E4, E5, E7 ja E8 on toteutettu oletuksena pois päältä, ja niiden kuuntelukoe on kansiossa `data/vertailu/2026-11-12_koe_e1_e4_e5_e7_e8/` (katso [Kuuntelukoe E1, E4, E5, E7 ja E8](#kuuntelukoe-e1-e4-e5-e7-ja-e8)).
+**Tilanne 12.11.2026:** E2 ja E6 ovat **käytössä** Juuson sokkokuuntelun perusteella. E3 on toteutettu, mutta se jäi pois päältä, koska h kuului usein h:na. Katso [Kuuntelukoe E2, E3 ja E6](#kuuntelukoe-e2-e3-ja-e6). Hienosäätöaineiston `metadata.csv` koottiin uudelleen (`--rebuild`), ja 251 tekstiä 273:sta muuttui, lähinnä alkukirjaimen osalta. Myös E1, E4, E5, E7 ja E8 ovat **käytössä** 12.11.2026 alkaen toisen sokkokokeen perusteella (katso [Kuuntelukoe E1, E4, E5, E7 ja E8](#kuuntelukoe-e1-e4-e5-e7-ja-e8)). `metadata.csv` koottiin niiden jälkeen uudelleen, ja 16 tekstiä 273:sta muuttui (esim. ”lues se”, ”kerror rauhassa”, ”tervettuloa”, ”rautatie-asema”). Seurattava: E8 lisää tavuviivan myös vakiintuneisiin sanoihin, kuten ”yli-opiston”, joka sanotaan yleensä yhteen. Testaamatta ovat E9–E14.
 
 Jokainen odottaa Juuson päätöstä, ja jokainen testataan kuuntelukokeella ennen käyttöönottoa, kuten projektissa on tähän asti tehty: sama lause merkittynä ja merkitsemättä, useampi lause ja ilmiö kerrallaan.
 
 | # | Muutos | Peruste | Ehdotettu kuuntelukoe |
 |---|---|---|---|
-| E1 | **Kaksoispiste:** `synthesize` jakaa lauseen kaksoispisteen kohdalta, tuottaa osat erikseen ja liittää ne 0,3 s tauolla. | Kohta 1: hyväksytty kierroksella 1. | 4–6 lausetta, joissa kaksoispiste on eri asemissa (selitys, luettelo, kysymys). |
+| E1 | **Käytössä 12.11.2026.** **Kaksoispiste:** `synthesize` jakaa lauseen kaksoispisteen kohdalta, tuottaa osat erikseen ja liittää ne 0,3 s tauolla. | Kohta 1: hyväksytty kierroksella 1. | 4–6 lausetta, joissa kaksoispiste on eri asemissa (selitys, luettelo, kysymys). |
 | E2 | **Käytössä 12.11.2026.** **Aktiivin kieltomuoto** käynnistää rajageminaation: kieltoverbi + imperatiivin muotoinen sana (”ei kannata syöttää” → kannatas). | Kohta 2: ”kannatas” hyväksytty. Huom.: ”ei olet tehdä” ei voittanut. | Useita kieltolauseita eri verbeillä (kannata, tarvitse, ole, pysty, voi), merkittynä ja merkitsemättä. |
 | E3 | **Hylätty 12.11.2026 (pois päältä).** **h vokaalin edellä:** kun laukaiseva muoto edeltää vokaalilla alkavaa sanaa, loppuun lisätään h (”tarvitseh ymmärtää”, ”osatah itse”). Koskee samoja laukaisijoita kuin konsonantin edellä. | Kohta 3: hyväksytty neljässä lauseessa; kaikki muut kirjoitusasut hylättiin. | 6–8 lausetta, myös ”ei pysty arvioimaan” -tyyppiset. Kuuntele erityisesti, ettei h kuulu h:na. |
-| E4 | **Hallitseva verbi luettelon yli:** haku jatkuu pilkun yli, kun pilkun jälkeen tulee toinen 1. infinitiivi (”voi ehdottaa …, kirjoittaa saatetekstin”). | Kohta 2: ”kirjoittaas” hyväksytty. | 3–4 luettelolausetta. |
-| E5 | **Myönteinen imperatiivi** uudelleen käyttöön ilman kieltoa ja vastakohtaa (”kysy kolme asiaa” → kysyk). | Kohta 2: ”kysyk” hyväksytty. Aiempi hylkäys koski lausetta, jossa oli kielto ja vastakohta. | Imperatiivilauseita ilman kieltoa ja kieltolauseita rinnakkain. |
+| E4 | **Käytössä 12.11.2026.** **Hallitseva verbi luettelon yli:** haku jatkuu pilkun yli, kun pilkun jälkeen tulee toinen 1. infinitiivi (”voi ehdottaa …, kirjoittaa saatetekstin”). | Kohta 2: ”kirjoittaas” hyväksytty. | 3–4 luettelolausetta. |
+| E5 | **Käytössä 12.11.2026.** Koskee myös *älä*-sanan jälkeistä verbiä (”älä unohdas sammuttaa”). **Myönteinen imperatiivi** uudelleen käyttöön ilman kieltoa ja vastakohtaa (”kysy kolme asiaa” → kysyk). | Kohta 2: ”kysyk” hyväksytty. Aiempi hylkäys koski lausetta, jossa oli kielto ja vastakohta. | Imperatiivilauseita ilman kieltoa ja kieltolauseita rinnakkain. |
 | E6 | **Käytössä 12.11.2026.** **Lauseen alkukirjain pieneksi** ennen synteesiä. Erisnimet säilyvät (Voikon sanaluokka). | Kohta 6: hyväksytty kahdessa lauseessa; laajentaa nykyisen Ä/Ö/Å-säännön. | 8–10 lausetta, joiden ensimmäinen äänne on t, r, k, a tai i, isolla ja pienellä, useammalla siemenellä. Vaikuttaa myös `metadata.csv`:hen. |
-| E7 | **Kahdennus yhdyssanan sisällä:** Voikon `WORDBASES` jakaa yhdyssanan, ja kun alkuosa on e-loppuinen nomini (saate, perhe, huone), jälkiosan alkukonsonantti kahdennetaan (”saatettekstin”). | Kohta 7: hyväksytty. | 5–6 yhdyssanaa (saateteksti, perhetuttu, huonekalu, kirjekuori, venematka). |
-| E8 | **Tavuviiva yhdyssanan vokaalirajalle** (”pitopalvelu-yrittäjä”). | Kohta 5: hyväksytty yhdessä sanassa. Yleistys on epävarma. | Ensin koe 6–8 sanalla, joiden rajalla on vokaaliyhtymä. Otetaan käyttöön vain, jos virhe toistuu. |
+| E7 | **Käytössä 12.11.2026.** **Kahdennus yhdyssanan sisällä:** Voikon `WORDBASES` jakaa yhdyssanan, ja kun alkuosa on e-loppuinen nomini (saate, perhe, huone), jälkiosan alkukonsonantti kahdennetaan (”saatettekstin”). | Kohta 7: hyväksytty. | 5–6 yhdyssanaa (saateteksti, perhetuttu, huonekalu, kirjekuori, venematka). |
+| E8 | **Käytössä 12.11.2026.** **Tavuviiva yhdyssanan vokaalirajalle** (”pitopalvelu-yrittäjä”). | Kohta 5: hyväksytty yhdessä sanassa. Yleistys on epävarma. | Ensin koe 6–8 sanalla, joiden rajalla on vokaaliyhtymä. Otetaan käyttöön vain, jos virhe toistuu. |
 | E9 | **`--seeds`-tila** `speak.py`:hyn ja `f5fi`-moduuliin: jokaisen siemenen otto tallennetaan erikseen kuuntelua varten, ja kuuntelusivu kootaan automaattisesti. | Kohta 8: ainoa keino lausepainoon ennen hienosäätöä. Koulutusmateriaaleissa toteutettu `tools/f5_batch.py --seeds`. | Ei vaadi kuuntelukoetta, koska ei muuta ääntä. |
 | E10 | **Taukojen enimmäispituus** valinnaisena asetuksena (esim. `max_pause=0.15`), ei oletuksena. | Kohta 4: paransi useimpia lauseita, mutta ei kaikkia. | Ei tarvita, jos asetus on valinnainen. |
 | E11 | **j-kahdennus ennen ja-sanaa luettelossa** pois (”ideoidaj ja”). | Kohta 8, sivuhavainto. Testaamatta. | Luettelolauseet j-merkinnällä ja ilman, samalla siemenellä. |
@@ -251,14 +251,14 @@ Päätelmät:
 
 ### Kuuntelukoe E1, E4, E5, E7 ja E8
 
-Toteutus (oletuksena pois päältä):
+Toteutus (kokeen aikana pois päältä, 12.11.2026 alkaen oletuksena päällä):
 
 - **E1:** `f5fi.COLON_SPLIT` (tai `synthesize(..., colon_split=True)`) ja `f5fi.split_colon`. Teksti jaetaan kohdasta, jossa kaksoispisteen jälkeen tulee välilyönti, joten kellonaika ”10:30” säilyy. Ensimmäinen osa päättyy pisteeseen, myöhemmät osat alkavat pienellä kirjaimella, ja osat liitetään `COLON_GAP_S` = 0,3 s hiljaisuudella. Osien välistä hiljaisuutta ei jätetä ylimääräiseksi.
 - **E4:** `rajageminaatio.LIST_GOVERNOR` (tai `mark(..., list_governor=True)`). -aa/-ää-loppuinen infinitiivi pilkun tai ja-, tai- tai sekä-sanan jälkeen tulkitaan infinitiiviksi, kun samassa virkkeessä on aiemmin hallitsevan verbin infinitiivi.
 - **E5:** laukaisijatyyppi `imperative` on ollut moduulissa jo ennestään, joten koe tehtiin lisäämällä se joukkoon `ENABLED`. Mukana on myös 6.11. hylätty lause ”Älä mene sinne, vaan tule tänne”.
 - **E7:** `rajageminaatio.mark_compounds(..., e_gemination=True)` tai `COMPOUND_E`. Yhdyssanan osat saadaan Voikon `STRUCTURE`-kentästä. Kahdennus tehdään vain, kun alkuosa on perhe- tai huone-tyyppinen e-sana. Sen tunnistaa siitä, että Voikko hyväksyy partitiivin -tta/-ttä (perhettä, saatetta). Näin ”nukketeatteri” ja ”itsepalvelu” jäävät ennalleen.
 - **E8:** `mark_compounds(..., vowel_hyphen=True)` tai `COMPOUND_HYPHEN`. Tavuviiva lisätään yhdyssanan osien rajalle, kun vokaali kohtaa vokaalin. Sääntö koskee kaikkia osarajoja, joten ”tekoälyosaaminen” saa muodon ”teko-äly-osaaminen”.
-- Yksikkötestit: `tests/test_text.py` (`PendingOptionsTest`, `ColonSplitTest`).
+- Yksikkötestit: `tests/test_text.py` (`ListAndCompoundTest`, `ColonSplitTest`, `test_imperative_is_on_by_default`).
 
 Koeasetelma on sama kuin edellisessä kokeessa: 26 lausetta (E1 5, E4 5, E5 6, E7 5 ja E8 5), versiot A ja B siemenellä 1, sokkona ja arvotussa järjestyksessä (`koe.json`, `tee.py`). Molemmissa versioissa ovat mukana jo käytössä olevat E2 ja E6.
 
@@ -284,6 +284,7 @@ Päätelmät:
 - **E1, E5, E7 ja E8** paransivat lauseita, eikä yksikään lause huonontunut. E5:n 6.11. hylätty lause ”Älä mene sinne, vaan tule tänne” kuulosti nyt yhtä hyvältä merkittynä.
 - **E4** on samaa tasoa kuin käyttöön otettu E2 (2–1, kaksi tasan). Ainoa huonompi tapaus oli ja-sanan jälkeinen ”kirjoittaar raportti”. Juuson huomiot (E14 ja kurkkusulkeuma) osoittavat, että luetteloissa kahdennusta tarvitaan pikemmin enemmän kuin vähemmän.
 - Kokeesta syntyi kolme uutta ehdotusta: E12, E13 ja E14.
+- **Päätös 12.11.2026:** Juuso otti käyttöön kaikki viisi.
 
 E2:n myötä myös sivuhavainto kohdasta 2 korjaantui: moduuli merkitsee nyt molemmat kohdat (”ei kannatas syöttääp palveluun”), kun tekstiä ei merkitä käsin.
 

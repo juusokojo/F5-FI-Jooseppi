@@ -9,8 +9,10 @@ Each kind of trigger is switched on only after a listening test showed that mark
 
 - infinitive (on): 1st infinitive, "selittää sen" -> "selittääs sen". Listening test 2026-11-06: clearly better.
   Second test with 7 lines (s, p, k, l, t, m, j): marked better in 6, no difference in 1 (j), worse in none.
-- imperative, negative_imperative (off): "mene kotiin", "älä mene". Marking made "Älä mene sinne, vaan tule
-  tänne" sound unnatural; the unmarked line was already right.
+- imperative (on): 2nd person singular imperative, also after älä, "kysy neuvoa" -> "kysyn neuvoa", "sammuta
+  laite" -> "sammutal laite", "älä unohda sammuttaa" -> "älä unohdas sammuttaa". A first test (2026-11-06) with "Älä mene sinne, vaan tule tänne" sounded unnatural; the blind
+  listening test 2026-11-12 (docs/aantamishavainnot.md E5): marked better in 5 of 6, no difference in 1 (that line).
+- negative_imperative (off): "älä mene" -> "äläm mene". Not tested again.
 - connegative (on): active connegative after a negation verb,
   "ei kannata syöttää" -> "ei kannatas syöttää". Voikko analyzes the form as a 2nd person imperative, so it is told
   apart by the negation verb (ei, en, et, emme, ette, eivät) right before it. Blind listening test 2026-11-12
@@ -21,12 +23,14 @@ vowel_h (off, E3): before a word starting with a vowel the gemination is a glott
 comma, dash or k were not. Blind listening test 2026-11-12: better in 1 of 7, worse in 3 (the h was heard as h:
 "hikkunan", "huida"), so it is not used as a rule.
 
-Off until a listening test (docs/aantamishavainnot.md):
+On since the blind listening test 2026-11-12 (docs/aantamishavainnot.md):
 - LIST_GOVERNOR (E4): an -aa/-ää infinitive right after a comma or ja/tai/sekä counts as governed when an earlier
   governed infinitive is in the same sentence ("voi ehdottaa rakennetta, kirjoittaa saatetekstin" -> kirjoittaas).
+  Better in 2 of 5, worse in 1, no difference in 2.
 - mark_compounds (E7, E8): inside compounds (Voikko STRUCTURE), gemination after an e-ending first part of the
-  perhe/huone type ("saatetekstin" -> "saatettekstin"), and a hyphen where a part ending in a vowel meets one
-  starting with a vowel ("pitopalveluyrittäjä" -> "pitopalvelu-yrittäjä").
+  perhe/huone type ("saatetekstin" -> "saatettekstin", E7: better in 4 of 5, no difference in 1), and a hyphen
+  where a part ending in a vowel meets one starting with a vowel ("pitopalveluyrittäjä" -> "pitopalvelu-yrittäjä",
+  E8: better in 3 of 5, no difference in 1, one unrated; without the hyphen Whisper misheard 4 of 5 compounds).
 
 No marking across punctuation (a comma means a pause) or before a digit, nor before a vowel unless vowel_h. Forms Voikko does not know,
 such as most colloquial ones, are left alone.
@@ -35,11 +39,11 @@ Voikko (Homebrew libvoikko + the libvoikko Python binding) analyzes the words. W
 """
 import re
 
-ENABLED = {"infinitive", "connegative"}
+ENABLED = {"infinitive", "connegative", "imperative"}
 VOWEL_H = False
-LIST_GOVERNOR = False
-COMPOUND_E = False
-COMPOUND_HYPHEN = False
+LIST_GOVERNOR = True
+COMPOUND_E = True
+COMPOUND_HYPHEN = True
 LIST_JOINERS = {"ja", "tai", "sekä"}
 SENTENCE_END = re.compile(r"[.!?;:]")
 VOWELS = set("aeiouyäöå")

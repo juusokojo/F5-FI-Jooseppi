@@ -51,7 +51,7 @@ DEFAULT_REF = os.path.join(ROOT, "data", "viite", "v3", "viite_selitys_2.wav")
 BUNDLED_REF = os.path.join(BASE, "AsmoKoskinenRef_v1.wav")  # the clip that came with the base model
 
 LOWER_FIRST = True  # see lower_first()
-COLON_SPLIT = False  # E1 in docs/aantamishavainnot.md, listening test pending: split at ": " and join with a pause
+COLON_SPLIT = True  # E1 in docs/aantamishavainnot.md, on since 2026-11-12 (better in 3 of 5): split at ": ", join with a pause
 COLON_GAP_S = 0.3
 REF_PAD_MS = 600
 TAIL_S = 0.3  # extra time for the generated line; trailing silence is trimmed afterwards
@@ -223,10 +223,14 @@ def synthesize(tts, ref, ref_text, text, out, nfe=NFE, speed=1.0, seed=1, tail_s
     candidates > 1 generates that many takes (seeds seed, seed+1, ...), has local Whisper transcribe each and keeps
     the one closest to the text. This catches extra syllables and cut-off endings, not stress or tone. Lines under
     10 bytes get one take: Whisper hears one-word lines wrong even when they are right. Stops early on a perfect take.
+
+    colon_split (default COLON_SPLIT, only with normalize): say the parts around ': ' as separate takes (E1).
     """
+    if colon_split is None:
+        colon_split = COLON_SPLIT and normalize
     if normalize:
         text = normalize_text(text)
-    parts = split_colon(text) if (COLON_SPLIT if colon_split is None else colon_split) else [text]
+    parts = split_colon(text) if colon_split else [text]
     if len(parts) > 1:
         waves, takes, first_seed = [], [], None
         for p in parts:

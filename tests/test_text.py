@@ -53,8 +53,11 @@ class InfinitiveTest(unittest.TestCase):
         self.check("Täytyy sanoa, että hyvä.", "Täytyy sanoa, että hyvä.")
         self.check("Voisitko, siis, selittää sen?", "Voisitko, siis, selittää sen?")
 
-    def test_disabled_kinds_are_left_alone(self):
-        self.check("Älä mene sinne, vaan tule tänne.", "Älä mene sinne, vaan tule tänne.")
+    def test_imperative_is_on_by_default(self):
+        # E5, on since 2026-11-12; also after älä (the imperative's negative form geminates too)
+        self.check("Kysy neuvoa.", "Kysyn neuvoa.")
+        self.check("Älä mene sinne, vaan tule tänne.", "Älä menes sinne, vaan tulet tänne.")
+        self.assertEqual(rg.mark("Mene kotiin.", enabled={"infinitive"}), "Mene kotiin.")
 
     def test_enabled_kinds_can_be_chosen(self):
         self.assertEqual(rg.mark("Mene kotiin.", enabled={"imperative"}), "Menek kotiin.")
@@ -113,12 +116,15 @@ class VowelHTest(unittest.TestCase):
 
 
 @unittest.skipUnless(HAVE_VOIKKO, "Voikko puuttuu")
-class PendingOptionsTest(unittest.TestCase):
-    """E4, E7 and E8 in docs/aantamishavainnot.md; off until a listening test."""
+class ListAndCompoundTest(unittest.TestCase):
+    """E4, E7 and E8 in docs/aantamishavainnot.md; on since the listening test 2026-11-12."""
 
-    def test_off_by_default(self):
+    def test_on_by_default(self):
         text = "Voi ehdottaa rakennetta, kirjoittaa saatetekstin pitopalveluyrittäjälle."
-        self.assertEqual(rg.mark_compounds(rg.mark(text)), "Voi ehdottaar rakennetta, kirjoittaa saatetekstin pitopalveluyrittäjälle.")
+        self.assertEqual(rg.mark_compounds(rg.mark(text)),
+                         "Voi ehdottaar rakennetta, kirjoittaas saatettekstin pitopalvelu-yrittäjälle.")
+        self.assertEqual(rg.mark_compounds(rg.mark(text, list_governor=False), e_gemination=False, vowel_hyphen=False),
+                         "Voi ehdottaar rakennetta, kirjoittaa saatetekstin pitopalveluyrittäjälle.")
 
     def test_list_governor(self):
         self.assertEqual(rg.mark("Voi ehdottaa rakennetta, kirjoittaa saatetekstin ja ideoida.", list_governor=True),
@@ -133,7 +139,7 @@ class PendingOptionsTest(unittest.TestCase):
         self.assertEqual(rg.mark_compounds("saatetekstin, perhetuttu, huonekalu", e_gemination=True),
                          "saatettekstin, perhettuttu, huonekkalu")
         # nukke-type and itse do not double; vowel seams are left to the hyphen option
-        self.assertEqual(rg.mark_compounds("nukketeatteri, itsepalvelu, ruokaohje", e_gemination=True),
+        self.assertEqual(rg.mark_compounds("nukketeatteri, itsepalvelu, ruokaohje", e_gemination=True, vowel_hyphen=False),
                          "nukketeatteri, itsepalvelu, ruokaohje")
 
     def test_compound_vowel_hyphen(self):
@@ -142,7 +148,7 @@ class PendingOptionsTest(unittest.TestCase):
 
 
 class ColonSplitTest(unittest.TestCase):
-    """E1; off until a listening test."""
+    """E1; on since the listening test 2026-11-12."""
 
     @unittest.skipUnless(HAVE_VOIKKO, "Voikko puuttuu")
     def test_split(self):
@@ -150,7 +156,12 @@ class ColonSplitTest(unittest.TestCase):
         self.assertEqual(f5fi.split_colon("Kysy itseltäsi yksi asia: Mitä haluan oppia?"),
                          ["Kysy itseltäsi yksi asia.", "mitä haluan oppia?"])
         self.assertEqual(f5fi.split_colon("Kello on 10:30."), ["Kello on 10:30."])
-        self.assertFalse(f5fi.COLON_SPLIT)
+        self.assertTrue(f5fi.COLON_SPLIT)
+
+    def test_raw_text_is_not_split(self):
+        import inspect
+        import f5fi
+        self.assertIn("COLON_SPLIT and normalize", inspect.getsource(f5fi.synthesize))
 
 
 class NormalizeTest(unittest.TestCase):
@@ -178,7 +189,7 @@ class NormalizeTest(unittest.TestCase):
     @unittest.skipUnless(HAVE_VOIKKO, "Voikko puuttuu")
     def test_full_normalization(self):
         import f5fi
-        self.assertEqual(f5fi.normalize_text("Älä unohda sammuttaa valoja."), "älä unohda sammuttaav valoja.")
+        self.assertEqual(f5fi.normalize_text("Älä unohda sammuttaa valoja."), "älä unohdas sammuttaav valoja.")
 
 
 class ScoreTest(unittest.TestCase):

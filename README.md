@@ -51,6 +51,7 @@ Kaikki skriptit (`speak.py`, `compare_refs.py` ja `variants.py`) käyttävät sa
 | Korjaus | Miksi | Valitsin `speak.py`:ssä |
 |---|---|---|
 | Rajageminaatio kirjoitetaan auki: "voisitko selittää sen" muuttuu muotoon "voisitko selittääs sen" | Perusmalli ei tuota rajageminaatiota itse, mutta tuottaa sen, kun kahdentuva konsonantti on kirjoitettu tekstiin. Katso tarkemmin alta. | `--raw` ohittaa esikäsittelyn |
+| Kaksoispisteen kohdalta (": ") osat tuotetaan erillisinä ottoina ja liitetään 0,3 s tauolla; kellonaika "10:30" säilyy | Ilman jakoa malli ei pitänyt kaksoispisteen kohdalla taukoa. Sokkokoe 12.11.2026: jako parempi kaikissa 5 lauseessa. | `--raw` ohittaa |
 | Lauseen alkukirjain muutetaan pieneksi (nimet säilyvät) | Iso alkukirjain vaihtoi lauseen ensimmäisen äänteen: "Riittää" kuului muodossa "viittää" ja "Tutkijat" muodossa "Kutkijat". Sokkokokeessa 2026-11-12 pieni alkukirjain oli parempi neljässä lauseessa seitsemästä ja huonompi yhdessä, ja Whisper kuuli alun oikein 24 otossa 24:stä (isolla 18/24). Katso [E6](docs/aantamishavainnot.md#kuuntelukoe-e2-e3-ja-e6). | `--raw` ohittaa esikäsittelyn |
 | Iso Ä, Ö ja Å muutetaan pieniksi | Malli on oppinut sanan alun ison Ä:n huonosti: "Älä mene" kuului muodossa "Lämene". | `--raw` ohittaa esikäsittelyn |
 | Viitteen jälkeinen tauko 600 ms (F5:n oma tauko on 50 ms) | Lauseen alku ja tauot kuulostavat luontevammilta. | `--ref-pad-ms` |
@@ -59,7 +60,7 @@ Kaikki skriptit (`speak.py`, `compare_refs.py` ja `variants.py`) käyttävät sa
 
 **Huomio Whisperistä:** Whisper kuuli yksisanaiset repliikit väärin silloinkin, kun ne olivat oikein. Arvioi ne siksi korvakuulolta. Whisperin pisteet eivät myöskään erota lausepainoa tai intonaatiota: kahdeksan eri siemenen ottoa sai lähes aina pisteet 1,0, vaikka kuuntelussa kelpasi vain yksi.
 
-**Korjaukset, joita moduuli ei vielä tee:** Koulutusmateriaalit-projektin kuuntelussa (10.–11.11.2026) löytyi virheitä, jotka korjaantuivat mallille annetulla kirjoitusasulla. Pieni alkukirjain ja kahdennus kieltomuodon jälkeen testattiin sokkokokeessa 12.11.2026, ja ne ovat nyt käytössä. h vokaalin edellä ("tarvitseh ymmärtää") hylättiin yleissääntönä. Kahdennus yhdyssanan sisällä ("saatettekstin"), tavuviiva ("pitopalvelu-yrittäjä") ja kaksoispisteen jako osiin ovat yhä testaamattomia ehdotuksia tiedostossa [docs/aantamishavainnot.md](docs/aantamishavainnot.md). Siihen asti muut projektit tekevät ne tekstiin itse ([ohje](docs/kaytto-muissa-projekteissa.md#kirjoitusasukorjaukset-joita-moduuli-ei-vielä-tee)).
+**Korjaukset, joita moduuli ei vielä tee:** Koulutusmateriaalit-projektin kuuntelussa (10.–11.11.2026) löytyi virheitä, jotka korjaantuivat mallille annetulla kirjoitusasulla. Pieni alkukirjain ja kahdennus kieltomuodon jälkeen testattiin sokkokokeessa 12.11.2026, ja ne ovat nyt käytössä. h vokaalin edellä ("tarvitseh ymmärtää") hylättiin yleissääntönä. Toisen sokkokokeen jälkeen (12.11.2026) käyttöön otettiin myös kahdennus käskymuodon jälkeen ("kysyn neuvoa") ja luettelossa ("…, kirjoittaas saatetekstin"), kahdennus yhdyssanan sisällä ("saatettekstin"), tavuviiva yhdyssanan vokaalirajalle ("pitopalvelu-yrittäjä") sekä kaksoispisteen jako osiin. Avoimet ehdotukset ovat tiedostossa [docs/aantamishavainnot.md](docs/aantamishavainnot.md). Niiden korjaukset muut projektit tekevät tekstiin itse ([ohje](docs/kaytto-muissa-projekteissa.md#kirjoitusasukorjaukset-joita-moduuli-ei-vielä-tee)).
 
 **Satunnaisuus:** satunnaissiemen (`--seed`) vaikuttaa painotukseen. Se voi myös lisätä tai poistaa ylimääräisen tavun: siemenellä 2 "pullaato" muuttui oikeaksi "pullaaksi". Hienoisia vaihevirheitä esiintyy satunnaisesti eri sanoissa.
 
@@ -72,10 +73,13 @@ Jokainen sanaluokka otetaan käyttöön vasta kuuntelukokeen jälkeen:
 | Sanaluokka | Tila | Kuuntelukoe |
 |---|---|---|
 | 1. infinitiivi ja passiivin kieltomuoto ("ei mennä") | käytössä | 2026-11-06: selvä parannus. Toisessa kokeessa oli 7 lausetta, joissa kahdentui s, p, k, l, t, m tai j. Merkintä paransi kuutta lausetta, j:n kanssa eroa ei kuulunut, eikä mikään lause huonontunut. Merkintä paransi myös sävelkulkua ja painotusta. |
-| imperatiivi ("mene kotiin") | pois päältä | 2026-11-06: merkintä kuulosti epäluontevalta, ja merkitsemätön lause oli jo oikein. 2026-11-11 (Koulutusmateriaalit): myönteinen imperatiivi ilman kieltoa ja vastakohtaa hyväksyttiin käsin merkittynä ("kysyk kolme asiaa"). Uusi koe odottaa, katso [ehdotus E5](docs/aantamishavainnot.md#ehdotetut-moduulimuutokset). |
-| *älä* ("älä mene") | pois päältä | sama koe |
+| imperatiivi ("mene kotiin", myös *älä*-sanan jälkeen: "älä unohdas sammuttaa") | käytössä (`imperative`) | 2026-11-06: "Älä mene sinne, vaan tule tänne" kuulosti merkittynä epäluontevalta. 2026-11-12 sokkokoe: merkintä parempi 5 lauseessa 6:sta, ja tuo lause oli nyt tasan. Katso [E5](docs/aantamishavainnot.md#kuuntelukoe-e1-e4-e5-e7-ja-e8). |
+| *älä* itse ("älä mene" → "äläm mene") | pois päältä | 2026-11-06, ei testattu uudelleen |
 | aktiivin kieltomuoto ("ei kannata syöttää" → "kannatas") | käytössä (`connegative`) | 2026-11-12 sokkokoe: merkintä parempi 3 lauseessa 6:sta, huonompi 1:ssä ("kannatat tehdä"), ei eroa 2:ssa. Koulutusmateriaaleissa "kannatas" hyväksyttiin kahdesti. Katso [E2](docs/aantamishavainnot.md#kuuntelukoe-e2-e3-ja-e6). |
 | h vokaalin edellä ("ei tarvitse ymmärtää" → "tarvitseh") | pois päältä (`VOWEL_H`) | 2026-11-12 sokkokoe: parempi 1 lauseessa 7:stä, huonompi 3:ssa, koska h kuului h:na ("hikkunan", "huida"). |
+| infinitiivi luettelossa pilkun tai ja-sanan jälkeen ("voi ehdottaa …, kirjoittaas saatetekstin") | käytössä (`LIST_GOVERNOR`) | 2026-11-12 sokkokoe: parempi 2 lauseessa 5:stä, huonompi 1:ssä ("ja kirjoittaar raportti"), ei eroa 2:ssa. |
+| yhdyssanan sisällä e-loppuisen alkuosan jälkeen ("saatettekstin") | käytössä (`COMPOUND_E`) | 2026-11-12 sokkokoe: parempi 4 sanassa 5:stä, ei eroa 1:ssä. |
+| tavuviiva yhdyssanan vokaalirajalle ("pitopalvelu-yrittäjä") | käytössä (`COMPOUND_HYPHEN`) | 2026-11-12 sokkokoe: parempi 3:ssa, ei eroa 1:ssä, yksi arvioimatta. Ilman viivaa Whisper kuuli 4 yhdyssanaa 5:stä väärin. |
 
 Muoto "selittää" voi olla infinitiivi tai yksikön 3. persoona ("hän selittää sen"), eikä 3. persoona aiheuta kahdentumaa. Siksi tällaiset muodot merkitään vain, kun niitä edeltää verbi, jonka jälkeen tulee infinitiivi, esimerkiksi *voida*, *haluta*, *täytyä* tai *pitää*. Välissä saa olla enintään yksi sana. Merkintää ei tehdä välimerkin yli eikä vokaalin tai numeron edellä. Voikko ei tunne useimpia puhekielisiä muotoja, joten ne jäävät merkitsemättä.
 
