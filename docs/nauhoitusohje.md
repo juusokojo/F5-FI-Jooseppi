@@ -5,7 +5,7 @@ Ohjeessa on kaksi vaihetta:
 - **Vaihe A** on lyhyt kokeilu, jossa nauhoitat kolme viitenäytettä ja kuulet, kuinka hyvin F5 matkii ääntäsi ilman hienosäätöä. Nauhoitukseen kuluu noin 15 minuuttia.
 - **Vaihe B** on hienosäätöä varten nauhoitettava aineisto. Tavoite on noin tunti puhetta, ja vähimmäismäärä on noin 30 minuuttia. Aineiston voi nauhoittaa useassa osassa eri päivinä.
 
-Vaihe A2 tarkentaa vaihetta A: siinä nauhoitetaan eläytyviä viitteitä pitkiä lukutekstejä varten.
+Vaihe A2 tarkentaa vaihetta A: siinä nauhoitetaan eläytyviä viitteitä pitkiä lukutekstejä varten. Vaiheessa A3 nauhoitetaan lyhyitä tunnetilaviitteitä vuoropuheluja varten.
 
 Tee vaihe A ensin. Sen tuloksen perusteella päätämme, kuinka paljon aineistoa vaiheessa B kannattaa nauhoittaa.
 
@@ -96,6 +96,78 @@ Liioiteltu otto voi kuulostaa nauhoittaessa hölmöltä, mutta malli tasoittaa s
 Tallenna otot kansioon `data/raw/viitenäytteet-v3/`, niin ne pysyvät erillään aiemmista. Kaikkia tekstejä ei tarvitse nauhoittaa. Jo kaksi tai kolme tekstiä kolmella tavalla kertoo, mikä tyyli toimii. Kaikkiaan nauhoitukseen kuluu noin 15 minuuttia.
 
 Kun otot ovat valmiit, Claude käsittelee ne samaan tapaan kuin aiemmat viitteet. Sitten Claude tuottaa jokaisella otolla saman testikatkelman, jota käytettiin lähtötasonäytteessä, ja kokoaa ne kuuntelusivulle. Paras otto kertoo samalla, miten pitkät lukutekstit (vaihe B2) kannattaa lukea.
+
+## 2c. Vaihe A3: tunnetilaviitteet
+
+Vuoropuhelun demo (marraskuu 2026) osoitti, että hienosäädetty malli tuottaa tunteita hyvin, jos viite on oikeanlainen. Naisääni Justiina sai tunnetilansa kuudesta lyhyestä repliikistä, jotka oli sanottu kolmella kiihtymystasolla. Joosepin viitteet sen sijaan ovat luettua tekstiä, ja se kuului: miehen vuorosanat jäivät laimeammiksi kuin naisen. Tässä vaiheessa nauhoitetaan Joosepille vastaavat tunnetilaviitteet.
+
+Naisäänellä on kaksi viitesarjaa:
+
+- **Justiina** (`data/viite/justiina/`) on alkuperäinen kuuden repliikin sarja. Sen tunneilmaisu on paras, mutta viitteissä kuuluu huoneen kaiku.
+- **Justiina2** (`data/viite/justiina2/`) on nauhoitettu tämän vaiheen tunnetilarepliikeillä. Äänenlaatu on parempi, mutta tunneilmaisu on laimeampi.
+
+Justiina säilytetään, kunnes alkuperäinen puhuja nauhoittaa nämä repliikit samassa huoneessa ja samalla mikrofonilla kuin Joosepin viitteet. Silloin kaiku katoaa ja tunnetilat laajenevat.
+
+### Miten tunnetilaviitteet eroavat lukuviitteistä
+
+- **Sano, älä lue.** Jokaisen repliikin yllä on lyhyt tilanne. Kuvittele se ja sano repliikki jollekulle. Repliikin pitää kuulostaa siltä, että se syntyi juuri nyt.
+- **Puhekieltä ja lyhyitä repliikkejä.** Jokainen repliikki kestää noin 6–8 sekuntia. Jos sanot repliikin omin sanoin hieman eri tavalla, sekin käy, mutta kerro silloin, mitä sanoit, jotta tekstitiedosto vastaa ääntä.
+- **Tunne kuuluu sävystä ja temposta, ei voimakkuudesta.** Tämä on tärkeintä vihaisissa ja iloisissa repliikeissä. Kiukku kuuluu kireydestä, painokkuudesta ja kiihtyvästä temposta, ei huutamisesta. Kova huuto leikkautuu helposti, ja yksi kova huippu estää nostamasta muuta viitettä oikealle tasolle. Jos ääni kuitenkin nousee, siirry askel kauemmas mikrofonista.
+- **Surullinen ja hiljainen saa olla hiljaista.** Pysy silloin tavallista lähempänä mikrofonia, jotta kohina ei nouse. Valmisteluskripti nostaa tason oikeaksi.
+- **Sama huone ja sama mikrofoni kuin lauseaineistossa.** Etäisyys on noin 15–20 cm, ja alkuun ja loppuun jätetään noin sekunnin hiljaisuus.
+- **Nauhoita jokaisesta repliikistä 2–3 ottoa** ja pidä paras. Jos et osaa valita, säilytä kaikki ja nimeä ne numeroilla (`tunne_vihainen_a_1.wav`, `tunne_vihainen_a_2.wav`), niin Claude kokoaa niistä kuuntelusivun.
+
+### Repliikit
+
+Jokaisessa tunnetilassa on kaksi eri repliikkiä, a ja b. Kaksi eri repliikkiä antaa mallille kaksi esimerkkiä samasta tunteesta. Lisäksi jokaiselle vuorosanalle voi valita sävyltään sopivamman.
+
+**kertoja** (rauhallinen kirjakieli. Tilanne: aloitat tarinan tai opetusvideon kuulijoille.)
+> a: Oli tavallinen tiistaiaamu. Kukaan toimistossa ei vielä arvannut, että päivästä tulisi vuoden pisin.
+> b: Tässä harjoituksessa tutustutaan siihen, miten hyvä palaute rakentuu ja miksi sitä on joskus vaikea antaa.
+
+**arki** (neutraali ja ystävällinen. Tilanne: puhut työkaverille kahvihuoneessa.)
+> a: Joo, mä katoin sen eilen illalla. Ihan hyvä, mut pari kohtaa pitää vielä tarkistaa.
+> b: Mä voin hoitaa sen huomenna aamupäivällä, jos sulle sopii. Laitan viestin, kun se on valmis.
+
+**iloinen** (innostunut. Tilanne: kuulet juuri hyvän uutisen.)
+> a: Ei oo totta! Me päästiin sittenkin mukaan! Mä en ois ikinä uskonu, et se onnistuu.
+> b: Tää on just sitä, mitä mä toivoin. Kiitos, oikeesti, tää piristi koko päivän!
+
+**lämmin** (lempeä. Tilanne: lohdutat tai kehut läheistä.)
+> a: Hei, ei se mitään. Kaikille sattuu joskus. Tärkeintä on, että sä oot kunnossa.
+> b: Mä oon tosi ylpee susta. Sä teit sen ihan itse, vaikka se tuntu aluks vaikeelta.
+
+**huvittunut** (naurahtava. Tilanne: ystävä kertoo kommelluksestaan.)
+> a: Sä siis oikeesti laitoit sokeria suolan tilalle? Ja kaikki söi sen ja vielä kehu?
+> b: No niin, taas mentiin. Mä tiesin, et tää loppuu just näin. Joka kerta sama juttu.
+
+**epävarma** (mietteliäs ja empivä. Tilanne: et muista asiaa varmasti.)
+> a: En mä nyt ihan tiedä. Voi olla, et se oli tiistaina. Tai ehkä sittenkin keskiviikkona.
+> b: Mä luulen, et se menee näin, mut en mä oo ihan varma. Pitäis varmaan kysyä joltain.
+
+**epäluuloinen** (hämmentynyt ja kyseenalaistava. Tilanne: kuulemasi ei täsmää aiempaan.)
+> a: Hetkinen. Sä sanoit eilen ihan muuta. Mistä tää nyt yhtäkkiä tuli, ja miks mulle ei kerrottu?
+> b: Ai jaa. Ja kuka tän on päättäny? Kuulostaa vähän siltä, et tässä ei kerrota kaikkea.
+
+**ärtynyt** (kärsimätön. Tilanne: sama asia toistuu taas.)
+> a: Mä oon pyytäny tätä jo kolme kertaa. Onks se oikeesti niin vaikeeta muistaa?
+> b: Ei, nyt riittää. Mä en jaksa enää selittää samaa asiaa uudestaan ja uudestaan.
+
+**vihainen** (suuttunut, mutta ei huutava. Tilanne: sinua on kohdeltu epäreilusti.)
+> a: Tää ei käy! Te päätitte tän mun selän takana, ja nyt mun pitäis vaan hyväksyä se?
+> b: Älä yritä selittää! Mä tiedän ihan tarkalleen, mitä tapahtu, ja se oli väärin.
+
+**surullinen** (hiljainen ja väsynyt. Tilanne: kerrot pettymyksestä luotetulle ihmiselle.)
+> a: Mä odotin sitä niin kauan. Ja sit se vaan loppu, ihan yhtäkkiä. En mä tiedä, mitä nyt.
+> b: Ei se oo sun vika. Mä oon vaan tosi väsyny. Kaikki tuntuu nyt vähän raskaalta.
+
+### Tiedostot
+
+Nimeä tiedostot tunnetilan ja repliikin mukaan: `tunne_kertoja_a.wav`, `tunne_kertoja_b.wav`, `tunne_arki_a.wav` ja niin edelleen. Joosepin viitteitä on 20.
+
+Tallenna Joosepin viitteet kansioon `data/raw/tunneviitteet/jooseppi/` ja Justiinan viitteet kansioon `data/raw/tunneviitteet/justiina/`. Justiina2:n raakaotot ovat kansiossa `data/raw/tunneviitteet/justiina2/`. Nauhoitukseen kuluu puhujaa kohden noin 15–20 minuuttia.
+
+Kun viitteet ovat valmiit, Claude normalisoi ne, kirjoittaa jokaiselle tekstitiedoston ja tekee vuoropuhelun demon uudelleen uusilla viitteillä. Silloin kuulet suoraan, paraneeko miesääni.
 
 ## 3. Vaihe B: hienosäätöaineisto
 
