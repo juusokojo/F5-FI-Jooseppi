@@ -312,7 +312,7 @@ Testit (`tests/test_finetune.py`) ajavat saman silmukan pienellä mallilla: tied
 ## Lisenssit
 
 - **Lähdekoodi:** MIT, katso [LICENSE](LICENSE).
-- **Äänet Jooseppi (miesääni) ja Justiina (naisääni)**, eli hienosäädetyt painot ja viitenäytteet: painot on lisensoitu CC BY-NC 4.0 -lisenssillä, ja äänten käytölle on annettu erillinen lupa. Molemmat on kuvattu tiedostossa [AANI-JA-MALLI.md](AANI-JA-MALLI.md). Painoja ja ääniä ei ole tässä repositoriossa.
+- **Äänet Jooseppi (miesääni), Justiina ja Justiina2 (naisäänet) ja Valdemar (lapsen ääni)**, eli hienosäädetyt painot ja viitenäytteet: painot on lisensoitu CC BY-NC 4.0 -lisenssillä, ja äänten käytölle on annettu erillinen lupa, joka kattaa myös Oulun yliopiston opetus- ja tutkimusprojektit. Ne on kuvattu tiedostossa [AANI-JA-MALLI.md](AANI-JA-MALLI.md). Painoja ja ääniä ei ole tässä repositoriossa.
 - **Perusmalli ja riippuvuudet:** katso kohta Mallin tiedot yllä.
 
 ## Vaihtoehtoinen perusmalli: VoxCPM2

@@ -1,6 +1,6 @@
 # F5-fi: käyttö muissa projekteissa
 
-Tämä ohje on tarkoitettu Claude Code -istunnolle, joka tuottaa toisessa projektissa suomenkielistä puhetta käyttäjän äänellä. Ohje on päivitetty 2026-11-12.
+Tämä ohje on tarkoitettu Claude Code -istunnolle, joka tuottaa toisessa projektissa suomenkielistä puhetta F5-fi-mallin äänillä (Jooseppi, Justiina, Justiina2, Valdemar). Ohje on päivitetty 2026-11-24.
 
 ## Tilanne
 
@@ -12,13 +12,37 @@ Tämä ohje on tarkoitettu Claude Code -istunnolle, joka tuottaa toisessa projek
 
 ## Säännöt
 
-1. **Älä kopioi mallia, Python-ympäristöä tai skriptejä omaan projektiisi.** Viittaa niihin absoluuttisilla poluilla. Kopio jäisi jälkeen, kun malli hienosäädetään.
+1. **Älä kopioi mallia, Python-ympäristöä tai skriptejä omaan projektiisi.** Viittaa niihin absoluuttisilla poluilla (paikallinen käyttö) tai kutsu puhepalvelua (palvelinkäyttö, katso alla). Kopio jäisi jälkeen, kun malli hienosäädetään.
 2. **Älä muokkaa kansiota `/Users/jkojo22/Koodausprojektit/Kielimallit/f5-fi`.** Jos tarvitset muutoksen, kerro siitä käyttäjälle. Muutokset tehdään f5-fi-projektin omassa istunnossa ja testataan kuuntelemalla.
-3. **Ääni ja malli pysyvät käyttäjän koneella.** Älä julkaise tuotettua puhetta, viitenäytteitä tai kuuntelusivuja verkkoon, älä myöskään Artifactina. Perusmallin lisenssi on CC BY-NC, joten kaupallinen käyttö ei ole sallittua.
+3. **Ääni ja malli pysyvät käyttäjän hallinnassa:** omalla koneella tai Oulun yliopiston palvelimella, ja niitä käytetään vain opetukseen ja tutkimukseen: erillisissä projekteissa ensisijaisesti Oulun yliopiston opetus- ja tutkimushankkeissa, muissa tapauksissa kysy ensin käyttäjältä (katso [Käyttö Oulun yliopiston projekteissa ja palvelimella](#käyttö-oulun-yliopiston-projekteissa-ja-palvelimella)). Älä julkaise painoja, viitenäytteitä tai kuuntelusivuja verkkoon, älä myöskään Artifactina, äläkä tee puhepalvelusta yleisesti kutsuttavaa. Tuotetun puheen julkaiseminen verkkoon vaatii käyttäjän luvan ja merkinnän tekoälyn tuottamaksi. Perusmallin lisenssi on CC BY-NC, joten kaupallinen käyttö ei ole sallittua.
 4. **Kuuntelu ratkaisee.** Pyydä käyttäjää kuuntelemaan tulos. Whisperin pisteet kertovat vain, puuttuuko sanoja tai onko niitä liikaa. Painotusta, sävyä, intonaatiota tai yksisanaisia repliikkejä ne eivät arvioi: kun samasta lauseesta tehtiin kahdeksan ottoa eri siemenillä, lähes kaikkien pisteet olivat 1,0, vaikka käyttäjä kelpuutti niistä vain yhden.
 5. **Kysy ennen kuin asennat mitään** f5-fi:n ympäristöön tai omaan projektiisi.
 
+## Käyttö Oulun yliopiston projekteissa ja palvelimella
+
+Äänet ja mallit saa käyttää myös erillisissä projekteissa, jotka liittyvät **Oulun yliopiston opetukseen tai tutkimukseen** (lupa: [AANI-JA-MALLI.md](../AANI-JA-MALLI.md), kohta 2). Tällaisia ovat esimerkiksi Rooliharjoittelu ja Koulutusmateriaalit. Jos projekti ei selvästi liity opetukseen tai tutkimukseen (esimerkiksi kaupallinen tai ulkopuolisille tarjottava palvelu), älä käytä ääniä vaan kysy käyttäjältä.
+
+| Ääni | Kuvaus | Malli |
+|---|---|---|
+| `jooseppi` | aikuisen miehen ääni | Joosepin hienosäätö (`f5fi.FINETUNED_CKPT`) |
+| `justiina` | tunteikas aikuisen naisen ääni | sama malli, oma viite |
+| `justiina2` | rauhallinen aikuisen naisen ääni | sama malli, oma viite |
+| `valdemar` | lapsen ääni | oma hienosäätö |
+
+Valdemarin viitteitä ei ole kokeiltu aikuisten mallilla eikä päinvastoin. Palvelu valitsee mallin äänen mukaan, joten älä yhdistä niitä itse.
+
+**Palvelinkäytössä (Lehmus) projekti ei kopioi mallia eikä ympäristöä, vaan kutsuu puhepalvelua HTTP:llä.** Kuvaus on tiedostossa [palvelin-lehmus.md](palvelin-lehmus.md). Lyhyesti:
+
+- Osoite on tiedostossa `~/.f5-palvelu/osoite.json` (`{"url", "job", "started"}`) ja avain tiedostossa `~/.f5-palvelu/avain`. Avain vaihtuu joka käynnistyksellä: lue molemmat uudelleen, kun yhteys katkeaa, ja yritä kerran. Jos tiedostoa ei ole, palvelu ei ole käynnissä.
+- `GET /health` → `{"ok", "voices", "queue"}`. `POST /synthesize` (`Authorization: Bearer <avain>`, runko `{"voice", "clip", "text", "seed"}`) → mono-WAV, 16 bit, 24 kHz. Virheet ovat JSON-muodossa `{"error": ...}`: 401 avain, 400 tuntematon ääni tai viite tai virheellinen pyyntö, 503 + `Retry-After`, kun jono on täynnä.
+- `clip` on viiteäänitteen nimi ja valitsee äänen tunteen. Nimet ovat palvelun rekisterissä, ja 400-vastauksen virheilmoitus luettelee ne.
+- Lähetä tavallista kirjoitettua suomea, enintään muutama lause kerrallaan. **Palvelu tekee Voikko-normalisoinnin itse: älä tee rajageminaatiota tai pienaakkostusta omassa koodissasi.** Kirjoita luvut sanoina. Pidä näytettävä teksti ja puhuttava teksti erillään.
+- Älä kovakoodaa avainta tai osoitetta, älä kirjoita avainta lokiin tai repoon, äläkä kutsu palvelua suoraan selaimesta: kutsut tehdään sovelluksen palvelinpuolelta. Palvelu on tarkoitettu vain yliopiston sisäverkkoon.
+- Tuotettu puhe merkitään tekoälyn tuottamaksi ja ääni nimetään (nimeämisteksti: AANI-JA-MALLI.md, kohta 1).
+
 ## Polut ja suositellut asetukset
+
+Tämä osio koskee paikallista käyttöä käyttäjän Macilla. Palvelinkäytössä asetukset (viite, siemen, malli) tulevat palvelun rekisteristä.
 
 ```
 F5=/Users/jkojo22/Koodausprojektit/Kielimallit/f5-fi

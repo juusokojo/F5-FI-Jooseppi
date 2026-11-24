@@ -154,7 +154,7 @@ Palvelussa on myös laajempi rajapinta, jota Rooliharjoittelun sopimus ei vaadi:
 
 ## 8. Käyttöehdot ja turva
 
-- **Valdemar** (lapsen ääni) ja **Justiina2** otetaan mukaan: lupa on huoltajalta, ja huoltaja on Juuso Kojo. `AANI-JA-MALLI.md` kattaa nyt vain Joosepin ja Justiinan, joten lisää ne sinne ennen kuin painot siirretään: nimeämistapa, sallitut käyttötarkoitukset (opetus, tutkimus, maksuton koulutus) ja se, että lupa on huoltajan antama. Selvitä lisäksi, kuka yliopistolla vastaa äänitteiden ja mallien säilytyksestä (ääni on henkilötietoa).
+- **Valdemar** (lapsen ääni) ja **Justiina2** on lisätty tiedostoon `AANI-JA-MALLI.md` (24.11.2026), ja siinä on erikseen mainittu, että äänet ja mallit saa käyttää ja ajaa yliopiston palvelimilla Oulun yliopiston opetus- ja tutkimusprojekteissa. Selvitä silti, kuka yliopistolla vastaa äänitteiden ja mallien säilytyksestä (ääni on henkilötietoa) ja ketkä palvelimella pääsevät niihin käsiksi.
 - Mallin painot ovat CC BY-NC: palvelu on vain opetus- ja tutkimuskäyttöön, ei ulkopuolisille.
-- Ohjeen `docs/kaytto-muissa-projekteissa.md` sääntö 3 ("ääni ja malli pysyvät käyttäjän koneella") ei enää pidä paikkaansa palvelinkäytössä: päivitä se tietoisesti.
+- Ohjeen `docs/kaytto-muissa-projekteissa.md` sääntö 3 on päivitetty: ääni ja malli pysyvät käyttäjän hallinnassa omalla koneella tai yliopiston palvelimella, ja ulkoisille Oulun yliopiston projekteille on oma osio.
 - Avaimet ovat vain käyttäjän luettavissa (600), eikä niitä kirjoiteta lokiin eikä repoon (`.gitignore`). Rajapintaa ei saa avata klusterin ulkopuolelle: oman äänen kloonaus kenen tahansa kutsuttavaksi on väärinkäytön riski.
