@@ -12,6 +12,7 @@ Suomenkielinen F5-TTS-puhesynteesimalli, jota käytetään useissa projekteissa.
 | `docs/` | [Nauhoitusohje](docs/nauhoitusohje.md) ja [lukulauseet](docs/lukulauseet.md) oman äänen nauhoittamiseen. [Ääntämishavainnot](docs/aantamishavainnot.md) kuuntelukokeista ja ehdotetut moduulimuutokset. |
 | `checkpoints/` | Hienosäädetyt mallin versiot. |
 | `scripts/` | Datan valmistelu, hienosäätö ja puheen tuottaminen. |
+| `slurm/` | Puhepalvelun asennus ja ajo GPU-klusterissa Slurm-työnä, katso [docs/palvelin-lehmus.md](docs/palvelin-lehmus.md). Palvelun koodi on `scripts/serve.py`. |
 
 ## Ympäristö
 

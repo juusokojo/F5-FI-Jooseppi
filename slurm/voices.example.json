@@ -1,0 +1,40 @@
+{
+  "_comment": "ESIMERKKI. Korvaa äänet, tunteiden nimet ja viitetiedostot omilla. Suhteelliset polut ovat repositorion juuresta. Jokaisen viiteäänitteen vieressä on samanniminen .txt-tiedosto, jossa on viitteessä sanottu teksti (tai anna ref_text tässä). 'ckpt': 'default' = suositeltu hienosäädetty malli (Jooseppi), 'base' = perusmalli, tai polku. Tunteen 'seed' on oletussiemen, jolla tunne kuultiin hyväksi; Rooliharjoittelu valitsee vain äänen ja tunteen nimen. Tuntematon tunne korvataan oletustunteella.",
+  "voices": {
+    "jooseppi": {
+      "ckpt": "default",
+      "default_emotion": "neutraali",
+      "emotions": {
+        "neutraali":    {"ref": "data/viite/palvelu/jooseppi/neutraali.wav", "seed": 1},
+        "iloinen":      {"ref": "data/viite/palvelu/jooseppi/iloinen.wav", "seed": 1},
+        "huolestunut":  {"ref": "data/viite/palvelu/jooseppi/huolestunut.wav", "seed": 1},
+        "vihainen":     {"ref": "data/viite/palvelu/jooseppi/vihainen.wav", "seed": 1}
+      }
+    },
+    "justiina": {
+      "ckpt": "default",
+      "default_emotion": "neutraali",
+      "emotions": {
+        "neutraali":    {"ref": "data/viite/palvelu/justiina/neutraali.wav", "seed": 1},
+        "iloinen":      {"ref": "data/viite/palvelu/justiina/iloinen.wav", "seed": 1},
+        "huolestunut":  {"ref": "data/viite/palvelu/justiina/huolestunut.wav", "seed": 1},
+        "vihainen":     {"ref": "data/viite/palvelu/justiina/vihainen.wav", "seed": 1}
+      }
+    },
+    "justiina2": {
+      "ckpt": "default",
+      "default_emotion": "neutraali",
+      "emotions": {
+        "neutraali":    {"ref": "data/viite/palvelu/justiina2/neutraali.wav", "seed": 1}
+      }
+    },
+    "valdemar": {
+      "ckpt": "checkpoints/valdemar-v1/malli_002000.safetensors",
+      "default_emotion": "neutraali",
+      "emotions": {
+        "neutraali":    {"ref": "data/viite/palvelu/valdemar/neutraali.wav", "seed": 1},
+        "iloinen":      {"ref": "data/viite/palvelu/valdemar/iloinen.wav", "seed": 1}
+      }
+    }
+  }
+}

@@ -36,7 +36,10 @@ No marking across punctuation (a comma means a pause) or before a digit, nor bef
 such as most colloquial ones, are left alone.
 
 Voikko (Homebrew libvoikko + the libvoikko Python binding) analyzes the words. Without it the text is returned as is.
+Where the library is not in a system or Homebrew location (a cluster without root), VOIKKO_LIB_DIR names the directory
+holding libvoikko.so and VOIKKO_DICT_DIR the one holding the dictionary folder "5/" (slurm/install.sh builds both).
 """
+import os
 import re
 
 ENABLED = {"infinitive", "connegative", "imperative"}
@@ -69,8 +72,8 @@ def _analyzer():
     if _voikko is None:
         try:
             import libvoikko
-            libvoikko.Voikko.setLibrarySearchPath("/opt/homebrew/lib")
-            _voikko = libvoikko.Voikko("fi")
+            libvoikko.Voikko.setLibrarySearchPath(os.environ.get("VOIKKO_LIB_DIR") or "/opt/homebrew/lib")
+            _voikko = libvoikko.Voikko("fi", path=os.environ.get("VOIKKO_DICT_DIR") or None)
         except Exception as e:  # missing library or dictionary: no marking
             print(f"rajageminaatio: Voikko ei käytettävissä ({e}); teksti jätetään ennalleen")
             _voikko = False

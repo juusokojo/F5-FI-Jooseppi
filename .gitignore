@@ -14,3 +14,10 @@ base-voxcpm2/
 .venv-voxcpm/
 __pycache__/
 .DS_Store
+
+# Palvelin (Slurm): ympäristö, lokit, avaimet ja oma äänirekisteri
+.env-lehmus/
+slurm/voices.json
+slurm/*.log
+f5fi-*.log
+avaimet*.json
