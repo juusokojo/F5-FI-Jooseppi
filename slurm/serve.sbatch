@@ -18,20 +18,22 @@ set -euo pipefail
 F5_HOME=${F5_HOME:-$HOME/F5-FI-Jooseppi}
 F5_ENV=${F5_ENV:-$F5_HOME/.env-lehmus}
 VOIKKO_PREFIX=${VOIKKO_PREFIX:-$HOME/voikko}
-STATE_DIR=${F5SERVE_STATE_DIR:-$HOME/f5fi-tila}
+STATE_DIR=${F5SERVE_STATE_DIR:-$HOME/.f5-palvelu}   # tänne: osoite.json, avain (Rooliharjoittelu lukee nämä)
 VOICES=${F5SERVE_VOICES:-$F5_HOME/slurm/voices.json}
-KEYS=${F5SERVE_KEYS_FILE:-$STATE_DIR/avaimet.json}
-WORKERS=${F5SERVE_WORKERS:-2}
+KEYS=${F5SERVE_KEYS_FILE:-$STATE_DIR/avaimet.json}   # valinnainen: erä-avain omille ajoille
+WORKERS=${F5SERVE_WORKERS:-1}
+QUEUE=${F5SERVE_QUEUE:-4}                      # jonossa enintään näin monta lausetta, sitten 503
 MAX_SESSIONS=${F5SERVE_MAX_SESSIONS:-4}
 IDLE_EXIT_S=${F5SERVE_IDLE_EXIT_S:-0}          # >0: sammu, kun ei käyttöä näin monta sekuntia (vapauttaa GPU:n)
 RESUBMIT=${F5SERVE_RESUBMIT:-0}                # 1: jokainen työ tilaa seuraajansa, jolloin palvelu jatkuu viikosta toiseen
 LIFETIME_S=${F5SERVE_LIFETIME_S:-604800}       # sama kuin --time sekunteina
 OVERLAP_S=${F5SERVE_OVERLAP_S:-2700}           # seuraaja alkaa näin monta sekuntia ennen tämän päättymistä
 
-for f in "$F5_ENV/bin/python" "$VOICES" "$KEYS"; do
+for f in "$F5_ENV/bin/python" "$VOICES"; do
   [ -e "$f" ] || { echo "puuttuu: $f (aja slurm/install.sh ja tee voices.json)"; exit 1; }
 done
 mkdir -p "$STATE_DIR"
+chmod 700 "$STATE_DIR"
 
 export VOIKKO_LIB_DIR="$VOIKKO_PREFIX/lib" VOIKKO_DICT_DIR="$VOIKKO_PREFIX/lib/voikko"
 export HF_HUB_OFFLINE=1 WANDB_MODE=disabled PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
@@ -48,6 +50,6 @@ if [ "$RESUBMIT" = 1 ] && [ ! -e "$STATE_DIR/STOP" ]; then
 fi
 
 exec "$F5_ENV/bin/python" "$F5_HOME/scripts/serve.py" \
-  --voices "$VOICES" --state-dir "$STATE_DIR" --keys-file "$KEYS" \
-  --workers "$WORKERS" --max-sessions "$MAX_SESSIONS" --gpu-fraction "$GPU_FRACTION" \
-  --idle-exit "$IDLE_EXIT_S" ${F5SERVE_PORT:+--port "$F5SERVE_PORT"}
+  --voices "$VOICES" --state-dir "$STATE_DIR" --contract-dir "$STATE_DIR" ${KEYS:+$( [ -e "$KEYS" ] && echo --keys-file "$KEYS")} \
+  --workers "$WORKERS" --queue-interactive "$QUEUE" --max-sessions "$MAX_SESSIONS" --gpu-fraction "$GPU_FRACTION" \
+  --idle-exit "$IDLE_EXIT_S" ${F5SERVE_PORT:+--port "$F5SERVE_PORT"} ${F5SERVE_EXTRA_ARGS:-}   # lisävalitsimet, esim. "--nfe-default 16"

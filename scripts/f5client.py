@@ -1,7 +1,7 @@
 """Client for scripts/serve.py. Only needs httpx, so it can be copied into another project (Rooliharjoittelu).
 
     import f5client
-    addr = f5client.read_address("/polku/f5fi-tila/current.json")   # None = no service available right now
+    addr = f5client.read_address("/polku/.f5-palvelu/current.json")   # None = no service available right now
     if addr is None: ...                                            # show "puhepalvelu ei käytössä", text only, etc.
     client = f5client.Client(addr["url"], key)
     try:

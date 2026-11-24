@@ -316,6 +316,146 @@ class TestAuth(unittest.TestCase):
             self.assertIn("avaimia ei löytynyt", p.stderr)
 
 
+class TestContract(unittest.TestCase):
+    """The interface Rooliharjoittelu expects: osoite.json, avain, GET /health, POST /synthesize."""
+
+    @staticmethod
+    def harness(d, **kw):
+        h = Harness(d, **kw)
+        h.cfg.contract_dir = os.path.join(d, ".f5-palvelu")
+        h.key = serve.write_contract_key(h.cfg.contract_dir)
+        h.cfg.keys = {"interactive": h.key}
+        h.headers = {"Authorization": "Bearer " + h.key}
+        return h
+
+    def test_files_and_health(self):
+        import datetime
+
+        with tempfile.TemporaryDirectory() as d:
+            h = self.harness(d)
+            cdir = h.cfg.contract_dir
+            key_file, addr_file = os.path.join(cdir, "avain"), os.path.join(cdir, "osoite.json")
+            with h:
+                with open(key_file, encoding="utf-8") as f:
+                    self.assertEqual(f.read(), h.key)  # the key alone, no newline
+                self.assertEqual(os.stat(key_file).st_mode & 0o777, 0o600)
+                self.assertEqual(os.stat(addr_file).st_mode & 0o777, 0o600)
+                with open(addr_file, encoding="utf-8") as f:
+                    addr = json.load(f)
+                self.assertEqual(sorted(addr), ["job", "started", "url"])
+                self.assertTrue(addr["url"].startswith("http://"))
+                datetime.datetime.fromisoformat(addr["started"])
+                r = h.client.get("/health")  # no key needed
+                self.assertEqual(r.status_code, 200)
+                self.assertEqual(r.json(), {"ok": True, "voices": ["jooseppi", "valdemar"], "queue": 0})
+            self.assertFalse(os.path.exists(addr_file))  # removed on exit
+            self.assertTrue(os.path.exists(key_file))  # the key stays
+
+    def test_synthesize_returns_mono_16bit_24k_wav(self):
+        with tempfile.TemporaryDirectory() as d, self.harness(d) as h:
+            body = {"voice": "Jooseppi", "clip": "iloinen", "text": "Hei vaan. Mitä kuuluu?", "seed": 7}
+            r = h.client.post("/synthesize", json=body, headers=h.headers)
+            self.assertEqual(r.status_code, 200, r.text)
+            self.assertEqual(r.headers["content-type"], "audio/wav")
+            info = sf.info(io.BytesIO(r.content))
+            self.assertEqual((info.channels, info.samplerate, info.subtype), (1, 24000, "PCM_16"))
+            self.assertEqual(r.headers["x-seed"], "7")
+            del body["seed"]
+            r = h.client.post("/synthesize", json=body, headers=h.headers)
+            self.assertEqual(r.headers["x-seed"], "4")  # the clip's own default seed
+
+    def test_errors_are_json_with_error_field(self):
+        with tempfile.TemporaryDirectory() as d, self.harness(d, queue_interactive=3) as h:
+            post = lambda body, headers=None: h.client.post("/synthesize", json=body, headers=h.headers if headers is None else headers)  # noqa: E731
+            ok = {"voice": "jooseppi", "clip": "neutraali", "text": "Hei."}
+            cases = [
+                (401, post(ok, headers={})),
+                (401, post(ok, headers={"Authorization": "Bearer vaara"})),
+                (400, post({**ok, "voice": "kalle"})),  # unknown voice
+                (400, post({**ok, "clip": "raivoisa"})),  # unknown clip is an error here, not a fallback
+                (400, post({"voice": "jooseppi", "clip": "neutraali"})),  # no text
+                (400, post({**ok, "seed": "yksi"})),
+                (400, post({**ok, "text": "*huokaisee* 😀"})),  # nothing left to say
+                (400, post({**ok, "text": "Yksi. Kaksi. Kolme. Neljä."})),  # more sentences than the queue holds
+            ]
+            for want, r in cases:
+                self.assertEqual(r.status_code, want, r.text)
+                self.assertIsInstance(r.json()["error"], str)
+            r = h.client.post("/synthesize", content=b"ei json", headers=h.headers)
+            self.assertEqual((r.status_code, "error" in r.json()), (400, True))
+            self.assertIn("neutraali", post({**ok, "clip": "x"}).json()["error"])  # tells what exists
+
+    def test_full_queue_is_503_with_retry_after(self):
+        with tempfile.TemporaryDirectory() as d, self.harness(d, fake_delay=0.8, queue_interactive=1) as h:
+            body = {"voice": "jooseppi", "clip": "neutraali", "text": "Hei vaan."}
+            with ThreadPoolExecutor(3) as ex:
+                futs = []
+                for _ in range(3):  # one running, one waiting, the third finds the queue full
+                    futs.append(ex.submit(h.client.post, "/synthesize", json=body, headers=h.headers))
+                    time.sleep(0.2)
+                rs = [f.result() for f in futs]
+            self.assertEqual(sorted(r.status_code for r in rs), [200, 200, 503])
+            busy = next(r for r in rs if r.status_code == 503)
+            self.assertGreaterEqual(int(busy.headers["retry-after"]), 1)
+            self.assertIsInstance(busy.json()["error"], str)
+
+    def test_real_process_writes_and_removes_the_files(self):
+        import httpx
+
+        with tempfile.TemporaryDirectory() as d:
+            cdir = os.path.join(d, ".f5-palvelu")
+            proc = subprocess.Popen([sys.executable, SERVE_PY, "--voices", write_voices(d), "--backend", "fake",
+                                     "--contract-dir", cdir, "--addr-heartbeat", "0.3"],
+                                    stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                    env={**os.environ, "F5SERVE_KEYS_FILE": "", "SLURM_JOB_ID": "4242"})
+            self.addCleanup(lambda: proc.poll() is None and proc.kill())
+            addr_file = os.path.join(cdir, "osoite.json")
+            addr = wait_for(lambda: TestLifecycle.read(addr_file), 60)
+            self.assertEqual(addr["job"], 4242)  # a number, as in {"url": ..., "job": <työnumero>, "started": ...}
+            with open(os.path.join(cdir, "avain"), encoding="utf-8") as f:
+                key = f.read()
+            self.assertGreaterEqual(len(key), 32)
+            self.assertEqual(httpx.get(addr["url"] + "/health").json()["ok"], True)
+            body = {"voice": "valdemar", "clip": "neutraali", "text": "Moi."}
+            self.assertEqual(httpx.post(addr["url"] + "/synthesize", json=body).status_code, 401)
+            r = httpx.post(addr["url"] + "/synthesize", json=body, headers={"Authorization": f"Bearer {key}"})
+            self.assertEqual(r.status_code, 200)
+            proc.send_signal(signal.SIGTERM)
+            self.assertEqual(proc.wait(30), 0)
+            self.assertEqual(os.listdir(cdir), ["avain"])  # address and instance files gone, the key stays
+
+
+class TestMakeRegistry(unittest.TestCase):
+    def test_folder_to_registry_that_serve_accepts(self):
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "slurm"))
+        import make_registry
+
+        with tempfile.TemporaryDirectory() as d:
+            refs = os.path.join(d, "refs")
+            for voice, clips in {"Jooseppi": ["neutraali", "tunne_artynyt_a"], "valdemar": ["lapsi_iloinen"]}.items():
+                os.makedirs(os.path.join(refs, voice))
+                for c in clips:
+                    for ext in (".wav", ".txt"):
+                        with open(os.path.join(refs, voice, c + ext), "w", encoding="utf-8") as f:
+                            f.write("Viitteen sanat.")
+            with open(os.path.join(refs, "Jooseppi", "ilman_tekstia.wav"), "w") as f:  # no .txt: skipped
+                f.write("x")
+            ck = os.path.join(d, "valdemar.safetensors")
+            open(ck, "w").close()
+            msgs = []
+            reg = make_registry.build(refs, {"Valdemar": ck}, log=msgs.append)
+            self.assertEqual(sorted(reg["voices"]), ["jooseppi", "valdemar"])
+            self.assertEqual(sorted(reg["voices"]["jooseppi"]["emotions"]), ["neutraali", "tunne_artynyt_a"])
+            self.assertEqual(reg["voices"]["jooseppi"]["ckpt"], "default")
+            self.assertEqual(reg["voices"]["valdemar"]["default_emotion"], "lapsi_iloinen")
+            self.assertTrue(any("ilman_tekstia" in m for m in msgs))
+            path = os.path.join(d, "voices.json")
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(reg, f)
+            voices = serve.load_registry(path)  # with check_files: refs, transcripts and checkpoint exist
+            self.assertEqual(voices["valdemar"].ckpt, ck)
+
+
 class TestLifecycle(unittest.TestCase):
     """The real process with real signals: what Slurm does to the job."""
 
@@ -323,6 +463,7 @@ class TestLifecycle(unittest.TestCase):
         self.state = os.path.join(d, "state")
         proc = subprocess.Popen([sys.executable, SERVE_PY, "--voices", write_voices(d), "--state-dir", self.state,
                                  "--backend", "fake", "--no-auth", "--addr-heartbeat", "0.3", "--max-sessions", "2",
+                                 "--drain-quiet", "1",
                                  *extra], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
         self.addCleanup(lambda: proc.poll() is None and proc.kill())
         cur = os.path.join(self.state, "current.json")

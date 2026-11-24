@@ -1,6 +1,6 @@
 """Puhepalvelu: HTTP-rajapinta F5-fi-mallille, tarkoitettu ajettavaksi Slurm-työnä GPU-solmulla.
 
-    python scripts/serve.py --voices slurm/voices.json --state-dir $HOME/f5fi-tila --workers 2 --max-sessions 4
+    python scripts/serve.py --voices slurm/voices.json --contract-dir ~/.f5-palvelu --workers 1 --queue-interactive 4
 
 Rakenne (perustelut: docs/palvelin-lehmus.md):
 - Yksi portti, yksi HTTP-prosessi (portinvartija), joka pitää jonon, istuntopaikat ja osoitetiedoston.
@@ -9,6 +9,8 @@ Rakenne (perustelut: docs/palvelin-lehmus.md):
 - Teksti jaetaan lauseiksi (kuten read_text.py), ja jokainen lause on oma tehtävänsä. Reaaliaikaiset (interactive)
   tehtävät ohittavat erä- (batch) tehtävät jonossa, ja yksi erätehtävä on enintään yhden lauseen mittainen.
 - Istunnot: POST /sessions antaa paikan tai 429. Paikka vapautuu DELETE-kutsulla tai kun sydämenlyönti loppuu.
+- Rajapinta Rooliharjoittelulle: GET /health ja POST /synthesize ({voice, clip, text, seed}), osoite ~/.f5-palvelu/osoite.json,
+  avain ~/.f5-palvelu/avain (uusi joka käynnistyksessä). Istunto- ja /speak-rajapinta on laajempi lisä.
 - Elinkaari: valmis -> osoite kirjoitetaan tiedostoon; SIGUSR1 (Slurmin --signal) = aikaraja lähestyy; SIGTERM = sammuta
   siististi (ei uusia istuntoja, kesken olevat lauseet valmiiksi).
 """
@@ -17,6 +19,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
+import datetime
 import functools
 import heapq
 import hmac
@@ -28,6 +31,7 @@ import math
 import multiprocessing as mp
 import os
 import re
+import secrets
 import signal
 import socket
 import sys
@@ -43,6 +47,7 @@ import numpy as np
 import soundfile as sf
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -521,6 +526,8 @@ class Config:
     batch_max_chars: int = 5000
     keys: dict = field(default_factory=dict)  # role -> key; empty = no authentication (development only)
     addr_heartbeat_s: float = 10.0
+    contract_dir: str = ""  # Rooliharjoittelu's files: <dir>/osoite.json and <dir>/avain
+    drain_quiet_s: float = 20.0  # a draining instance leaves only after this long without requests
     idle_exit_s: float = 0.0  # >0: exit (and free the GPU) after this many seconds without sessions or requests
     term_grace_s: float = 15.0
     drain_max_s: float = 780.0
@@ -530,12 +537,29 @@ class Config:
     require_voikko: bool = True
 
 
-def write_json_atomic(path, obj):
+def write_json_atomic(path, obj, mode=None):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     tmp = f"{path}.{os.getpid()}.tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o666 if mode is None else mode)
+    if mode is not None:
+        os.fchmod(fd, mode)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
         json.dump(obj, f, ensure_ascii=False, indent=1)
     os.replace(tmp, path)
+
+
+def write_contract_key(directory: str) -> str:
+    """A new random key for the app in <directory>/avain (mode 600), at every start. Only the key, nothing else."""
+    os.makedirs(directory, mode=0o700, exist_ok=True)
+    key = secrets.token_urlsafe(32)
+    path = os.path.join(directory, "avain")
+    tmp = f"{path}.{os.getpid()}.tmp"
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    os.fchmod(fd, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
+        f.write(key)
+    os.replace(tmp, path)
+    return key
 
 
 def read_json(path):
@@ -582,6 +606,11 @@ class Service:
             if cur and cur.get("job_id") == self.job_id:
                 with contextlib.suppress(OSError):
                     os.remove(self._current_file())
+        if self.cfg.contract_dir:  # the key stays; the address goes, unless a successor has already replaced it
+            cur = read_json(self._contract_file())
+            if cur and str(cur.get("job")) == self.job_id:
+                with contextlib.suppress(OSError):
+                    os.remove(self._contract_file())
 
     def request_exit(self, code=0):
         self.exit_code = code
@@ -607,7 +636,8 @@ class Service:
                 log.info("ei käyttöä %.0f sekuntiin: sammutaan ja vapautetaan GPU", self.cfg.idle_exit_s)
                 self.begin_drain("ei käyttöä")
                 self.request_exit(0)
-            if self.state == "draining" and self._idle() and time.monotonic() - self.drain_since > 3:
+            quiet = time.monotonic() - max(self.drain_since or 0.0, self.last_activity)
+            if self.state == "draining" and self._idle() and quiet > self.cfg.drain_quiet_s:
                 log.info("tyhjä ja tyhjennystilassa: sammutaan")
                 self.request_exit(0)
             if self.state == "draining" and time.monotonic() - self.drain_since > self.cfg.drain_max_s:
@@ -676,13 +706,25 @@ class Service:
     def publish(self, force=False):
         """Instance file always; current.json (the one clients read) only at the first time, then only while it is
         still ours, so that an old instance never overwrites its successor."""
-        if not self.cfg.state_dir or self.state not in ("ready", "draining"):
+        if self.state not in ("ready", "draining"):
             return
         addr = self.address()
-        write_json_atomic(self._instance_file(), addr)
-        cur = read_json(self._current_file())
-        if force or cur is None or cur.get("job_id") == self.job_id:
-            write_json_atomic(self._current_file(), addr)
+        if self.cfg.state_dir:
+            write_json_atomic(self._instance_file(), addr)
+            cur = read_json(self._current_file())
+            if force or cur is None or cur.get("job_id") == self.job_id:
+                write_json_atomic(self._current_file(), addr)
+        if self.cfg.contract_dir and force:
+            self._write_contract_address(addr)
+
+    def _contract_file(self):
+        return os.path.join(self.cfg.contract_dir, "osoite.json")
+
+    def _write_contract_address(self, addr):
+        """osoite.json exactly as Rooliharjoittelu expects it: url, job, started (mode 600)."""
+        job = int(self.job_id) if self.job_id.isdigit() else self.job_id
+        started = datetime.datetime.fromtimestamp(self.started_at).astimezone().isoformat(timespec="seconds")
+        write_json_atomic(self._contract_file(), {"url": addr["url"], "job": job, "started": started}, mode=0o600)
 
     def successor_ready(self) -> bool:
         if not self.cfg.state_dir:
@@ -709,6 +751,14 @@ class SpeakReq(BaseModel):
     nfe: int | None = Field(None, ge=4, le=64)
 
 
+class Fail(Exception):
+    """Why a request could not be served; each endpoint turns it into its own kind of error response."""
+
+    def __init__(self, kind, msg="", retry_after=None):
+        super().__init__(kind)
+        self.kind, self.msg, self.retry_after = kind, msg, retry_after
+
+
 def create_app(svc: Service) -> FastAPI:
     cfg = svc.cfg
 
@@ -731,6 +781,108 @@ def create_app(svc: Service) -> FastAPI:
             if hmac.compare_digest(token.encode(), key.encode()):
                 return role
         raise HTTPException(401, "virheellinen tai puuttuva avain", headers={"WWW-Authenticate": "Bearer"})
+
+    def prepare(text, prio, max_sentences):
+        text = clean_text(text)
+        sentences = split_sentences(text)
+        max_chars = cfg.max_chars if prio == INTERACTIVE else cfg.batch_max_chars
+        if not sentences:
+            raise Fail("empty_text", "teksti on tyhjä (siivouksen jälkeen ei jäänyt puhuttavaa)")
+        if len(text) > max_chars:
+            raise Fail("too_long", f"teksti on liian pitkä ({len(text)} merkkiä, enintään {max_chars})")
+        if prio == INTERACTIVE and len(sentences) > max_sentences:
+            raise Fail("too_long", f"liian monta lausetta ({len(sentences)}, enintään {max_sentences})")
+        return text, sentences
+
+    async def render(voice, emo_name, emo, text, sentences, prio, seed, nfe):
+        """One sentence = one job. Returns (wav bytes, response headers) or raises Fail."""
+        seed = emo.seed if seed is None else seed
+        nfe = nfe or emo.nfe or 32
+        payloads = [{"voice": voice.name, "emotion": emo_name, "text": s, "seed": seed, "nfe": nfe} for s in sentences]
+        try:
+            jobs = svc.engine.submit_many(prio, payloads, cfg.wait_deadline_s if prio == INTERACTIVE else None)
+        except QueueFull as e:
+            raise Fail("queue_full", "jono on täynnä", e.retry_after) from None
+        try:
+            results = await asyncio.gather(*(j.fut for j in jobs), return_exceptions=True)
+        finally:
+            for j in jobs:
+                if not j.fut.done():
+                    svc.engine.cancel(j)
+        for r in results:
+            if isinstance(r, JobExpired):
+                raise Fail("waited_too_long", "lause odotti jonossa liian kauan", 2)
+            if isinstance(r, BaseException):
+                raise Fail("synthesis_failed", "synteesi epäonnistui", 2)
+        sr = results[0][1]
+        parts = []
+        for k, (wave, _) in enumerate(results):
+            if k:
+                parts.append(np.zeros(int(SENTENCE_PAUSE_S * sr), np.float32))
+            parts.append(wave)
+        audio = np.concatenate(parts)
+        buf = io.BytesIO()
+        sf.write(buf, audio, sr, format="WAV", subtype="PCM_16")
+        wait, gen = max(j.wait_s for j in jobs), sum(j.gen_s for j in jobs)
+        log.info("puhe %s/%s %d merkkiä, %d lausetta, odotus %.2f s, generointi %.2f s", voice.name, emo_name, len(text),
+                 len(sentences), wait, gen)
+        return buf.getvalue(), {
+            "X-Voice": voice.name, "X-Emotion": emo_name, "X-Seed": str(seed), "X-Sentences": str(len(sentences)),
+            "X-Duration-S": f"{len(audio) / sr:.2f}", "X-Wait-S": f"{wait:.3f}", "X-Gen-S": f"{gen:.3f}"}
+
+    # ---- the interface Rooliharjoittelu uses: /health and /synthesize
+
+    def jerr(status, msg, retry_after=None):
+        return JSONResponse({"error": msg}, status_code=status,
+                            headers={"Retry-After": str(retry_after)} if retry_after else None)
+
+    @app.get("/health")
+    async def health(response: Response):
+        ok = svc.state == "ready" and svc.engine.alive() > 0
+        response.status_code = 200 if ok else 503
+        return {"ok": ok, "voices": sorted(svc.voices), "queue": svc.engine.waiting()}
+
+    @app.post("/synthesize")
+    async def synthesize(request: Request):
+        """{"voice", "clip", "text", "seed"?} -> audio/wav. Errors are {"error": "..."}: 401 key, 400 request,
+        503 + Retry-After when the queue is full or the line waited too long."""
+        try:
+            role = auth(request)
+        except HTTPException:
+            return jerr(401, "virheellinen tai puuttuva avain")
+        if svc.state not in ("ready", "draining"):
+            return jerr(503, f"palvelu ei ole valmis ({svc.state})", 5)
+        try:
+            body = await request.json()
+        except ValueError:
+            body = None
+        if not isinstance(body, dict):
+            return jerr(400, "runko ei ole JSON-objekti")
+        voice_name, clip, text, seed = body.get("voice"), body.get("clip"), body.get("text"), body.get("seed")
+        if not all(isinstance(x, str) for x in (voice_name, clip, text)):
+            return jerr(400, "kentät voice, clip ja text ovat pakollisia merkkijonoja")
+        if seed is not None and (isinstance(seed, bool) or not isinstance(seed, int)):
+            return jerr(400, "seed on kokonaisluku")
+        voice = svc.voices.get(voice_name.strip().lower())
+        if voice is None:
+            return jerr(400, f"tuntematon ääni {voice_name!r} (äänet: {', '.join(sorted(svc.voices))})")
+        key = clip.strip().lower()
+        emo = voice.emotions.get(key)
+        if emo is None:
+            known = sorted(voice.emotions)
+            return jerr(400, f"tuntematon viite {clip!r} äänelle {voice.name} (viitteitä {len(known)}: "
+                             f"{', '.join(known[:20])}{' …' if len(known) > 20 else ''})")
+        prio = INTERACTIVE if role == "interactive" else BATCH
+        svc.last_activity = time.monotonic()
+        try:
+            text, sentences = prepare(text, prio, min(cfg.max_sentences, cfg.queue_interactive))
+            wav, headers = await render(voice, key, emo, text, sentences, prio, seed, None)
+        except Fail as f:
+            status = {"empty_text": 400, "too_long": 400, "queue_full": 503, "waited_too_long": 503}.get(f.kind, 500)
+            return jerr(status, f.msg, f.retry_after)
+        return Response(wav, media_type="audio/wav", headers=headers)
+
+    # ---- the fuller interface (sessions, emotions with fallback, batch key)
 
     @app.get("/healthz")
     async def healthz(response: Response):
@@ -792,46 +944,14 @@ def create_app(svc: Service) -> FastAPI:
         if prio == INTERACTIVE and not (req.session_id and svc.sessions.touch(req.session_id)):
             raise HTTPException(410, {"detail": "no_session"})
         svc.last_activity = time.monotonic()
-        text = clean_text(req.text)
-        max_chars = cfg.max_chars if prio == INTERACTIVE else cfg.batch_max_chars
-        sentences = split_sentences(text)
-        if not sentences:
-            raise HTTPException(422, {"detail": "empty_text"})
-        if len(text) > max_chars or (prio == INTERACTIVE and len(sentences) > cfg.max_sentences):
-            raise HTTPException(422, {"detail": "too_long", "max_chars": max_chars, "max_sentences": cfg.max_sentences})
-        seed = emo.seed if req.seed is None else req.seed
-        nfe = req.nfe or emo.nfe or 32
-        payloads = [{"voice": voice.name, "emotion": emo_name, "text": s, "seed": seed, "nfe": nfe} for s in sentences]
         try:
-            jobs = svc.engine.submit_many(prio, payloads, cfg.wait_deadline_s if prio == INTERACTIVE else None)
-        except QueueFull as e:
-            raise HTTPException(429, {"detail": "queue_full"}, headers={"Retry-After": str(e.retry_after)}) from None
-        try:
-            results = await asyncio.gather(*(j.fut for j in jobs), return_exceptions=True)
-        finally:
-            for j in jobs:
-                if not j.fut.done():
-                    svc.engine.cancel(j)
-        for r in results:
-            if isinstance(r, JobExpired):
-                raise HTTPException(503, {"detail": "waited_too_long"}, headers={"Retry-After": "2"})
-            if isinstance(r, BaseException):
-                raise HTTPException(503, {"detail": "synthesis_failed"}, headers={"Retry-After": "2"})
-        sr = results[0][1]
-        parts = []
-        for k, (wave, _) in enumerate(results):
-            if k:
-                parts.append(np.zeros(int(SENTENCE_PAUSE_S * sr), np.float32))
-            parts.append(wave)
-        audio = np.concatenate(parts)
-        buf = io.BytesIO()
-        sf.write(buf, audio, sr, format="WAV", subtype="PCM_16")
-        wait, gen = max(j.wait_s for j in jobs), sum(j.gen_s for j in jobs)
-        log.info("speak %s/%s %d merkkiä, %d lausetta, odotus %.2f s, generointi %.2f s", voice.name, emo_name, len(text),
-                 len(sentences), wait, gen)
-        return Response(buf.getvalue(), media_type="audio/wav", headers={
-            "X-Voice": voice.name, "X-Emotion": emo_name, "X-Seed": str(seed), "X-Sentences": str(len(sentences)),
-            "X-Duration-S": f"{len(audio) / sr:.2f}", "X-Wait-S": f"{wait:.3f}", "X-Gen-S": f"{gen:.3f}"})
+            text, sentences = prepare(req.text, prio, cfg.max_sentences)
+            wav, headers = await render(voice, emo_name, emo, text, sentences, prio, req.seed, req.nfe)
+        except Fail as f:
+            status = {"empty_text": 422, "too_long": 422, "queue_full": 429}.get(f.kind, 503)
+            hdr = {"Retry-After": str(f.retry_after)} if f.retry_after else None
+            raise HTTPException(status, {"detail": f.kind, "message": f.msg}, headers=hdr) from None
+        return Response(wav, media_type="audio/wav", headers=headers)
 
     return app
 
@@ -883,6 +1003,10 @@ def parse_args(argv=None) -> tuple[Config, argparse.Namespace]:
     ap.add_argument("--gpu-fraction", type=float, default=0.0, help="GPU-muistin osuus per työläinen (0 = ei rajaa)")
     ap.add_argument("--term-grace", type=float, default=d.term_grace_s, dest="term_grace_s")
     ap.add_argument("--drain-max", type=float, default=d.drain_max_s, dest="drain_max_s")
+    ap.add_argument("--contract-dir", default=os.environ.get("F5SERVE_CONTRACT_DIR", ""),
+                    help="Rooliharjoittelun tiedostot: <kansio>/osoite.json ja <kansio>/avain (uusi satunnainen avain joka käynnistyksellä)")
+    ap.add_argument("--drain-quiet", type=float, default=d.drain_quiet_s, dest="drain_quiet_s",
+                    help="tyhjentyvä instanssi sammuu vasta, kun näin monta sekuntia on kulunut viimeisestä pyynnöstä")
     ap.add_argument("--idle-exit", type=float, default=0.0, dest="idle_exit_s",
                     help="sammu, kun palvelua ei ole käytetty näin moneen sekuntiin (0 = ei koskaan)")
     ap.add_argument("--allow-no-voikko", action="store_true", help="käynnistä vaikka Voikkoa ei löydy (kahdennussäännöt jäävät pois)")
@@ -894,10 +1018,10 @@ def parse_args(argv=None) -> tuple[Config, argparse.Namespace]:
                  session_ttl_s=a.session_ttl_s, queue_interactive=a.queue_interactive, queue_batch=a.queue_batch,
                  wait_deadline_s=a.wait_deadline_s, admit_wait_limit_s=a.admit_wait_limit_s, gen_timeout_s=a.gen_timeout_s,
                  term_grace_s=a.term_grace_s, drain_max_s=a.drain_max_s, gpu_fraction=a.gpu_fraction,
-                 addr_heartbeat_s=a.addr_heartbeat_s, idle_exit_s=a.idle_exit_s,
+                 addr_heartbeat_s=a.addr_heartbeat_s, idle_exit_s=a.idle_exit_s, contract_dir=a.contract_dir, drain_quiet_s=a.drain_quiet_s,
                  fake_delay=a.fake_delay, fake_load_delay=a.fake_load_delay, require_voikko=not a.allow_no_voikko)
     cfg.keys = {} if a.no_auth else load_keys(a.keys_file)
-    if not a.no_auth and not cfg.keys:
+    if not a.no_auth and not cfg.keys and not a.contract_dir:
         ap.error("avaimia ei löytynyt: anna --keys-file (tai F5SERVE_KEY_INTERACTIVE/_BATCH, vähintään 16 merkkiä) tai --no-auth")
     return cfg, a
 
@@ -905,6 +1029,10 @@ def parse_args(argv=None) -> tuple[Config, argparse.Namespace]:
 def main(argv=None) -> int:
     cfg, _ = parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    if cfg.contract_dir:
+        cfg.contract_dir = os.path.expanduser(cfg.contract_dir)
+        cfg.state_dir = os.path.expanduser(cfg.state_dir) or cfg.contract_dir
+        cfg.keys["interactive"] = write_contract_key(cfg.contract_dir)  # the app reads it from <contract_dir>/avain
     fake = cfg.backend == "fake"
     voices = load_registry(cfg.voices_path, check_files=not fake)
     if not fake and cfg.require_voikko and not check_voikko():

@@ -1,24 +1,23 @@
-"""Measure how many simultaneous role-play sessions a running service holds (run it against the real GPU job).
+"""Measure how many simultaneous role-play users a running service holds (run it against the real GPU job).
 
-    python scripts/serve_bench.py --state-dir ~/f5fi-tila --key-file ~/f5fi-tila/avaimet.json \
-        --voice jooseppi --sessions 4 --turns 6 --think-s 5
+    python scripts/serve_bench.py --voice justiina2 --clip neutraali --users 3 --turns 6 --think-s 8
 
-Each simulated user opens a session, then speaks `--turns` short bursts (1-3 sentences) with `--think-s` seconds of
-"thinking" between them, as a live conversation would. Prints, per run, the time until the audio is ready (what the
-user waits for) and how much of it was queueing. Raise --sessions until the p95 time grows past what you accept
-(1.5-2 s is a reasonable limit for a spoken reply); the number just below is the safe value for --max-sessions.
+Reads the address and key like Rooliharjoittelu does (~/.f5-palvelu/osoite.json and avain, or --contract-dir/--url/--key).
+Each simulated user speaks `--turns` short bursts (1-3 sentences) to POST /synthesize with `--think-s` seconds of
+"thinking" between them, as a live conversation would. Prints the time until the audio is ready (what the user waits
+for), how much of it was queueing, and how many requests the service turned away (503). Raise --users until the p95
+time grows past what you accept (1.5-2 s is reasonable for a spoken reply); the number just below is how many
+conversations the app should let in at once.
 """
 import argparse
 import json
 import os
 import random
-import statistics
 import sys
 import threading
 import time
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import f5client  # noqa: E402
+import httpx
 
 SENTENCES = [
     "Hei, mukava tavata.", "Kerro vähän, mitä on tapahtunut.", "En oikein tiedä, mitä siihen sanoisi.",
@@ -27,67 +26,65 @@ SENTENCES = [
 ]
 
 
-def user(n, client, args, rows, lock):
+def user(n, http, args, rows, lock):
     rnd = random.Random(n)
-    try:
-        s = client.session()
-    except f5client.ServiceBusy as e:
+    time.sleep(rnd.uniform(0, args.think_s))  # users do not all start at the same moment
+    for _ in range(args.turns):
+        body = {"voice": args.voice, "clip": args.clip, "text": " ".join(rnd.choice(SENTENCES) for _ in range(rnd.randint(1, 3)))}
+        t0 = time.monotonic()
+        try:
+            r = http.post("/synthesize", json=body)
+            total = time.monotonic() - t0
+            if r.status_code == 200:
+                row = ("ok", total, float(r.headers["x-wait-s"]), 0)
+            else:
+                row = ("busy" if r.status_code == 503 else f"virhe {r.status_code}", total, 0, int(r.headers.get("retry-after", 0)))
+                if r.status_code != 503:
+                    print("  vastaus:", r.status_code, r.text[:150], file=sys.stderr)
+        except httpx.HTTPError as e:
+            row = (f"yhteysvirhe {type(e).__name__}", time.monotonic() - t0, 0, 0)
         with lock:
-            rows.append(("rejected", e.reason, 0, 0))
-        return
-    with s:
-        for _ in range(args.turns):
-            text = " ".join(rnd.choice(SENTENCES) for _ in range(rnd.randint(1, 3)))
-            t0 = time.monotonic()
-            try:
-                _, info = s.speak(args.voice, text, args.emotion)
-                total, wait = time.monotonic() - t0, float(info["wait_s"])
-                with lock:
-                    rows.append(("ok", info["sentences"], total, wait))
-            except (f5client.ServiceBusy, f5client.ServiceDown) as e:
-                with lock:
-                    rows.append(("failed", str(e), time.monotonic() - t0, 0))
-            time.sleep(args.think_s * rnd.uniform(0.5, 1.5))
+            rows.append(row)
+        time.sleep(max(row[3], args.think_s * rnd.uniform(0.5, 1.5)))
 
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
+    ap.add_argument("--contract-dir", default=os.path.expanduser("~/.f5-palvelu"))
     ap.add_argument("--url")
-    ap.add_argument("--state-dir", help="luetaan current.json")
-    ap.add_argument("--key-file", help='JSON {"interactive": ...}')
     ap.add_argument("--key")
     ap.add_argument("--voice", required=True)
-    ap.add_argument("--emotion")
-    ap.add_argument("--sessions", type=int, default=2)
+    ap.add_argument("--clip", required=True)
+    ap.add_argument("--users", type=int, default=2)
     ap.add_argument("--turns", type=int, default=5)
-    ap.add_argument("--think-s", type=float, default=5.0)
+    ap.add_argument("--think-s", type=float, default=6.0)
     args = ap.parse_args()
-    url = args.url
+    url, key = args.url, args.key
     if not url:
-        addr = f5client.read_address(os.path.join(args.state_dir, "current.json"))
-        if addr is None:
-            sys.exit("palvelua ei löydy (current.json puuttuu, on vanha tai ei ole ready-tilassa)")
-        url = addr["url"]
-    key = args.key
-    if not key and args.key_file:
-        with open(args.key_file, encoding="utf-8") as f:
-            key = json.load(f)["interactive"]
-    client = f5client.Client(url, key)
+        with open(os.path.join(args.contract_dir, "osoite.json"), encoding="utf-8") as f:
+            url = json.load(f)["url"]
+    if not key:
+        with open(os.path.join(args.contract_dir, "avain"), encoding="utf-8") as f:
+            key = f.read().strip()
+    http = httpx.Client(base_url=url, headers={"Authorization": f"Bearer {key}"}, timeout=60)
+    print("palvelu:", http.get("/health").json())
     rows, lock = [], threading.Lock()
-    threads = [threading.Thread(target=user, args=(i, client, args, rows, lock)) for i in range(args.sessions)]
+    threads = [threading.Thread(target=user, args=(i, http, args, rows, lock)) for i in range(args.users)]
     for t in threads:
         t.start()
     for t in threads:
         t.join()
     ok = [r for r in rows if r[0] == "ok"]
-    print(f"{args.sessions} istuntoa x {args.turns} vuoroa: {len(ok)} onnistui, "
-          f"{sum(r[0] == 'rejected' for r in rows)} istuntoa hylättiin, {sum(r[0] == 'failed' for r in rows)} pyyntöä epäonnistui")
+    other = {}
+    for r in rows:
+        if r[0] != "ok":
+            other[r[0]] = other.get(r[0], 0) + 1
+    print(f"{args.users} käyttäjää x {args.turns} vuoroa: {len(ok)} onnistui, muut: {other or 'ei yhtään'}")
     if ok:
-        tot, wait = sorted(r[2] for r in ok), sorted(r[3] for r in ok)
+        tot, wait = sorted(r[1] for r in ok), sorted(r[2] for r in ok)
         q = lambda a, f: a[min(len(a) - 1, int(f * len(a)))]  # noqa: E731
-        print(f"äänen valmistumisaika s: p50 {q(tot, .5):.2f}  p95 {q(tot, .95):.2f}  max {tot[-1]:.2f}  keskiarvo {statistics.mean(tot):.2f}")
+        print(f"äänen valmistumisaika s: p50 {q(tot, .5):.2f}  p95 {q(tot, .95):.2f}  max {tot[-1]:.2f}")
         print(f"  josta jonossa     s: p50 {q(wait, .5):.2f}  p95 {q(wait, .95):.2f}  max {wait[-1]:.2f}")
-    print("palvelimen tila:", json.dumps(client.status()["recent"]))
 
 
 if __name__ == "__main__":
