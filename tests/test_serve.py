@@ -425,6 +425,135 @@ class TestContract(unittest.TestCase):
             self.assertEqual(os.listdir(cdir), ["avain"])  # address and instance files gone, the key stays
 
 
+class TestPuhepalveluClient(unittest.TestCase):
+    """scripts/puhepalvelu_client.py against the real server process (fake backend)."""
+
+    def start(self, d, *extra):
+        cdir = os.path.join(d, ".f5-palvelu")
+        proc = subprocess.Popen([sys.executable, SERVE_PY, "--voices", write_voices(d), "--backend", "fake",
+                                 "--contract-dir", cdir, "--addr-heartbeat", "0.3", *extra],
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+                                env={**os.environ, "F5SERVE_KEYS_FILE": ""})
+        self.addCleanup(lambda: proc.poll() is None and proc.kill())
+        wait_for(lambda: TestLifecycle.read(os.path.join(cdir, "osoite.json")), 60)
+        return proc, cdir
+
+    def test_speak_errors_and_voices(self):
+        import puhepalvelu_client as pc
+
+        with tempfile.TemporaryDirectory() as d:
+            proc, cdir = self.start(d)
+            c = pc.Puhepalvelu(cdir)
+            self.assertEqual(c.health(), {"ok": True, "voices": ["jooseppi", "valdemar"], "queue": 0})
+            self.assertEqual(c.voices()["jooseppi"]["emotions"], ["iloinen", "neutraali"])
+            p = c.synthesize("Jooseppi", "iloinen", "Hei vaan. Mitä kuuluu?", seed=3)
+            self.assertEqual((p.voice, p.clip, p.seed, p.sentences), ("jooseppi", "iloinen", 3, 2))
+            info = sf.info(io.BytesIO(p.wav))
+            self.assertEqual((info.channels, info.samplerate, info.subtype), (1, 24000, "PCM_16"))
+            with self.assertRaises(pc.VirheellinenPyynto) as cm:
+                c.synthesize("jooseppi", "raivoisa", "Hei.")
+            self.assertIn("neutraali", str(cm.exception))  # the message lists what exists
+            proc.send_signal(signal.SIGTERM)
+            proc.wait(30)
+
+    def test_no_service(self):
+        import puhepalvelu_client as pc
+
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(pc.EiKaytossa):
+                pc.Puhepalvelu(os.path.join(d, "ei-ole")).health()
+
+    def test_survives_a_restart_with_new_port_and_key(self):
+        import puhepalvelu_client as pc
+
+        with tempfile.TemporaryDirectory() as d:
+            a, cdir = self.start(d)
+            c = pc.Puhepalvelu(cdir)
+            c.synthesize("valdemar", "neutraali", "Ensimmäinen.")
+            old = (c.url, c.key)
+            a.send_signal(signal.SIGTERM)
+            self.assertEqual(a.wait(30), 0)
+            with self.assertRaises(pc.EiKaytossa):  # nobody there now: osoite.json is gone
+                c.synthesize("valdemar", "neutraali", "Ei kuulu.")
+            b, _ = self.start(d)  # the next job: other port, new key
+            p = c.synthesize("valdemar", "neutraali", "Toinen.")  # same client object, no reconfiguration
+            self.assertEqual(p.voice, "valdemar")
+            self.assertNotEqual((c.url, c.key), old)
+            b.send_signal(signal.SIGTERM)
+            b.wait(30)
+
+    def test_busy_service_raises_or_waits(self):
+        import puhepalvelu_client as pc
+
+        with tempfile.TemporaryDirectory() as d:
+            proc, cdir = self.start(d, "--fake-delay", "0.8", "--queue-interactive", "1")
+            c = pc.Puhepalvelu(cdir)
+            args = ("jooseppi", "neutraali", "Hei vaan.")
+
+            def burst(**kw):
+                with ThreadPoolExecutor(3) as ex:
+                    futs = []
+                    for _ in range(3):
+                        futs.append(ex.submit(lambda: self._try(c, args, kw)))
+                        time.sleep(0.2)
+                    return [f.result() for f in futs]
+
+            results = burst()  # one running, one waiting, the third finds the queue full
+            self.assertEqual(sorted(results), ["ok", "ok", "varattu"])
+            results = burst(wait_s=10)  # allowed to wait for a place: all three get their speech
+            self.assertEqual(results, ["ok", "ok", "ok"])
+            proc.send_signal(signal.SIGTERM)
+            proc.wait(30)
+
+    def test_guide_code_matches_file_and_snippets_work(self):
+        """docs/rooliharjoittelu-ohje.md: Appendix A is the client file, and the example code in the steps runs."""
+        import re
+
+        import puhepalvelu_client as pc
+
+        root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with open(os.path.join(root, "docs", "rooliharjoittelu-ohje.md"), encoding="utf-8") as f:
+            doc = f.read()
+        with open(os.path.join(root, "scripts", "puhepalvelu_client.py"), encoding="utf-8") as f:
+            self.assertIn(f.read().rstrip("\n"), doc)  # no drift between the guide and the file
+        blocks = re.findall(r"```python\n(.*?)```", doc, re.S)
+        find = lambda name: next(b for b in blocks if name in b)  # noqa: E731
+        ns = {}
+        exec(find("def tulkitse"), ns)  # noqa: S102
+        äänet = {"justiina2": {"default_emotion": "neutraali", "emotions": ["neutraali", "tunne_artynyt_a"]}}
+        t = ns["tulkitse"]
+        self.assertEqual(t('{"teksti": "Hei.", "tunne": "Tunne_Artynyt_A"}', "justiina2", äänet), ("Hei.", "tunne_artynyt_a"))
+        self.assertEqual(t('{"teksti": "Hei.", "tunne": "raivoisa"}', "justiina2", äänet), ("Hei.", "neutraali"))  # unknown
+        self.assertEqual(t('{"teksti": "Hei."}', "justiina2", äänet), ("Hei.", "neutraali"))  # no emotion
+        self.assertEqual(t("Pelkkä teksti.", "justiina2", äänet), ("Pelkkä teksti.", "neutraali"))  # not JSON
+        exec(find("class Paikat"), ns)  # noqa: S102
+        with tempfile.TemporaryDirectory() as d:
+            proc, cdir = self.start(d)
+            c = pc.Puhepalvelu(cdir)
+            paikat = ns["Paikat"](2)
+            self.assertEqual([ns["voiko_aloittaa"](c, paikat)[0] for _ in range(3)], [True, True, False])
+            self.assertEqual(ns["voiko_aloittaa"](c, paikat)[1], "kaikki paikat ovat käytössä")
+            paikat.vapauta()
+            self.assertTrue(ns["voiko_aloittaa"](c, paikat)[0])  # the place was freed
+            exec(find("def puhu_repliikki"), ns)  # noqa: S102
+            soitetut = []
+            ns["puhu_repliikki"](c, "jooseppi", "neutraali", 1, "Hei vaan. Mitä kuuluu? Hyvää!", soitetut.append)
+            self.assertEqual(len(soitetut), 3)  # three sentences, three requests, in order
+            self.assertTrue(all(sf.info(io.BytesIO(w)).samplerate == 24000 for w in soitetut))
+            proc.send_signal(signal.SIGTERM)
+            proc.wait(30)
+
+    @staticmethod
+    def _try(c, args, kw):
+        import puhepalvelu_client as pc
+
+        try:
+            c.synthesize(*args, **kw)
+            return "ok"
+        except pc.Varattu:
+            return "varattu"
+
+
 class TestMakeRegistry(unittest.TestCase):
     def test_folder_to_registry_that_serve_accepts(self):
         sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "slurm"))
